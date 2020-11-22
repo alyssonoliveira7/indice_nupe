@@ -5,16 +5,14 @@ graphics.off()
 
 # Pacotes -----------------------------------------------------------------
 
+library(zoo)
 library(tidyverse)
 library(BatchGetSymbols)
 library(lubridate)
 library(scales)
 library(GetBCBData)
 library(writexl)
-library(zoo)
 library(IndexNumR)
-library(quantmod)
-
 
 # Parâmetros --------------------------------------------------------------
 
@@ -41,7 +39,6 @@ tickers.ce <- c(
   'MDIA3.SA',
   'HAPV3.SA'
 )
-
 
 # Importando dados --------------------------------------------------------
 
@@ -268,7 +265,8 @@ pesos_variaveis <- empresas_df %>%
   select(date, ticker, peso) %>%
   pivot_wider(
     names_from = ticker,
-    values_from = peso
+    values_from = peso,
+    values_fn = sum
   ) %>%
   fill(where(is.numeric), .direction = "downup")
 
@@ -277,20 +275,6 @@ pesos_variaveis <- pesos_variaveis %>%
     cols = where(is.numeric),
     names_to = "ticker",
     values_to = "peso"
-  )
-
-pesos <- volumes %>%
-  summarise_if(
-    is.numeric,
-    ~rollsum(x = ., k = 12, na.pad = F, align = "right")
-  ) %>%
-  mutate_all(last) %>%
-  unique.data.frame() %>%
-  pivot_longer(
-    cols = everything()
-  ) %>%
-  mutate(
-    peso = (value/sum(value))
   )
 
 # Padronizando pesos
@@ -336,6 +320,31 @@ z <- x %>%
     ) %>%
   select(-total)
 
+# selecionando pesos atuais
+
+pesos <- z %>%
+  mutate_all(last) %>%
+  unique.data.frame() %>%
+  pivot_longer(
+    cols = !date,
+    names_to = 'ticker',
+    values_to = 'peso_padronizado'
+  ) %>%
+  mutate(
+    date = ymd(paste0(str_sub(date, end = 7), '01'))
+  ) %>%
+  left_join(
+    volumes_12_meses_df %>%
+      tail(1) %>%
+      pivot_longer(
+        !date,
+        names_to = 'ticker',
+        values_to = 'volume'
+      ),
+    by = c('date', 'ticker')
+  )
+
+# Consolidando pase dos pesos
 
 pesos_variaveis <- z %>%
   pivot_longer(
@@ -343,6 +352,7 @@ pesos_variaveis <- z %>%
     names_to = "ticker",
     values_to = "peso"
   )
+
 
 # Consolidando base -------------------------------------------------------
 
@@ -352,57 +362,14 @@ empresas_ce <- empresas_df %>%
   select(-volume) %>%
   filter(date >= inicial.date_indice)
 
-# Calculando valor do portifólio ------------------------------------------
-
-# Transformando base em matriz
-
-empresas_matrix <- empresas_df %>%
-  filter(ticker != "Ibovespa") %>%
-  select(-volume) %>%
-  pivot_wider(
-    names_from = ticker,
-    values_from = price.close
-  ) %>% arrange(date) %>%
-  mutate_if(is.numeric, ~ifelse(is.na(.), 0, .)) %>%
-  as.matrix()
-
-data <- empresas_matrix[,1]
-
-rownames(empresas_matrix) <- empresas_matrix[,1]
-empresas_matrix <- empresas_matrix[,-1]
-
-# Trnasformando pesos em matriz
-
-pesos_matrix <- as.matrix(pesos$peso)
-
-# Calculando Valor do portifolio
-
-empresas_matrix <- apply(empresas_matrix, 2, as.numeric)
-
-valor_portifolio <- empresas_matrix %*% (pesos_matrix*100)
-
-rownames(valor_portifolio) <- data
-
-valor_portifolio <- tibble(
-  date = rownames(valor_portifolio),
-  valor_portifolio = as.numeric(valor_portifolio)
-)
-
-valor_portifolio <- valor_portifolio %>%
-  filter(valor_portifolio > 0) %>%
-  mutate(
-    var_mensal = valor_portifolio/lag(valor_portifolio, n = 1) - 1,
-    var_anual = valor_portifolio/lag(valor_portifolio, n = 12) - 1,
-    date = ymd(date)
-  )
-
 # Índices --------------------------------------------------------
 
 t1 <- empresas_ce %>%
   select(-peso) %>%
   pivot_wider(
     names_from = ticker,
-    values_from = price.close
+    values_from = price.close,
+    values_fn = sum
   ) %>%
   pivot_longer(
     cols = !date,
@@ -416,7 +383,8 @@ t2 <- empresas_ce %>%
   select(-price.close) %>%
   pivot_wider(
     names_from = ticker,
-    values_from = peso
+    values_from = peso,
+    values_fn = sum
   ) %>%
   mutate_if(is.numeric, ~ifelse(is.na(.), 0, .)) %>%
   pivot_longer(
@@ -487,13 +455,13 @@ indice_df <- indice_df %>%
     ibovespa = (ibovespa/dplyr::first(ibovespa))*100,
     var_diaria_ibovespa = (ibovespa/lag(ibovespa) - 1),
     var_52_semanas_ibovespa = (ibovespa/lag(ibovespa, 52) - 1)
-  )
-
+  ) %>%
+  relocate(var_diaria_ibovespa, .after = var_diaria_laspeyres)
 
 # Base de dados Mensal
 
 indice_mensal_df <- indice_df %>%
-  select(-var_diaria_laspeyres, -var_diaria_ibovespa) %>%
+  select(date, indice_laspeyres, ibovespa) %>%
   group_by(month = month(date), year = year(date)) %>%
   slice(which.max(day(date))) %>%
   ungroup() %>%
@@ -507,6 +475,86 @@ indice_mensal_df <- indice_df %>%
     var_mensal_ibovespa = (ibovespa/lag(ibovespa) - 1),
     acum_12_ibovespa = (ibovespa/lag(ibovespa, 12) - 1)
   )
+
+# Calculando o acumulado do ano
+
+tx_variacao <- indice_mensal_df %>%
+  select(date, var_mensal_laspeyres, var_mensal_ibovespa) %>%
+  drop_na() %>%
+  mutate(
+    var_mensal_laspeyres = 1 + var_mensal_laspeyres,
+    var_mensal_ibovespa = 1 + var_mensal_ibovespa
+
+    ) %>%
+  group_by(year(date)) %>%
+  summarise(
+    acum_ano_laspeyres = cumprod(var_mensal_laspeyres) - 1,
+    acum_ano_ibovespa = cumprod(var_mensal_ibovespa) - 1
+  ) %>%
+  ungroup() %>%
+  janitor::clean_names()
+
+data_tx_variacao <- indice_mensal_df %>%
+  drop_na(var_mensal_laspeyres) %>%
+  pull(date)
+
+tx_variacao$date <- data_tx_variacao
+
+
+tx_variacao <- tx_variacao %>%
+  select(-year_date) %>%
+  relocate(date)
+
+indice_mensal_df <- indice_mensal_df %>%
+  left_join(tx_variacao, by = 'date') %>%
+  relocate(var_mensal_ibovespa, .after = var_mensal_laspeyres) %>%
+  relocate(c(acum_12_laspeyres, acum_12_ibovespa), .after = last_col())
+
+# Calculando valor do portifólio ------------------------------------------
+
+# Transformando base em matriz
+
+empresas_matrix <- empresas_df %>%
+  filter(ticker != "Ibovespa", !date %in% remover_data, date != "2020-11-20") %>%
+  select(-volume) %>%
+  pivot_wider(
+    names_from = ticker,
+    values_from = price.close,
+    values_fn = sum
+  ) %>% arrange(date) %>%
+  mutate_if(is.numeric, ~ifelse(is.na(.), 0, .)) %>%
+  as.matrix()
+
+data <- empresas_matrix[,1]
+
+rownames(empresas_matrix) <- empresas_matrix[,1]
+empresas_matrix <- empresas_matrix[,-1]
+
+# Trnasformando pesos em matriz
+
+pesos_matrix <- as.matrix(pesos$peso_padronizado)
+
+# Calculando Valor do portifolio
+
+empresas_matrix <- apply(empresas_matrix, 2, as.numeric)
+
+valor_portifolio <- empresas_matrix %*% (pesos_matrix*100)
+
+rownames(valor_portifolio) <- data
+
+valor_portifolio <- tibble(
+  date = rownames(valor_portifolio),
+  valor_portifolio = as.numeric(valor_portifolio)
+)
+
+valor_portifolio <- valor_portifolio %>%
+  filter(valor_portifolio > 0) %>%
+  mutate(
+    var_diaria = valor_portifolio/lag(valor_portifolio, n = 1) - 1,
+    var_anual = valor_portifolio/lag(valor_portifolio, n = 12) - 1,
+    date = ymd(date)
+    )
+
 
 # Gráficos diários --------------------------------------------------------
 
@@ -560,7 +608,7 @@ g1 <- indice_df %>%
     legend.key.width =  unit(1.5, "lines")
   )
 
-g1
+g1 + ggeasy::easy_all_text_color('black')
 
 # Variação diária
 
@@ -709,9 +757,7 @@ g4 <- indice_mensal_df %>%
 
 g4
 
-
 # variação Mensal
-
 
 last_row_laspeyres_mensal <- indice_mensal_df %>%
   tail(1) %>%
@@ -765,8 +811,60 @@ g5 <- indice_mensal_df %>%
     legend.key.width =  unit(1.5, "lines")
   )
 
-
 g5
+
+# Acumulado do ano
+
+last_row_laspeyres_acum_ano <- indice_mensal_df %>%
+  tail(1) %>%
+  select(date, acum_ano_laspeyres)
+
+last_row_ibovespa_acum_ano <- indice_mensal_df %>%
+  tail(1) %>%
+  select(date, acum_ano_ibovespa)
+
+g6 <- indice_mensal_df %>%
+  select(date, acum_ano_laspeyres, acum_ano_ibovespa) %>%
+  pivot_longer(!date) %>%
+  mutate(
+    name = factor(
+      name,
+      levels = c("acum_ano_laspeyres", "acum_ano_ibovespa")
+    ),
+    name = fct_recode(
+      name,
+      "Ibovespa" = "acum_ano_ibovespa",
+      "Índice Laspeyres" = "acum_ano_laspeyres"
+    )
+  ) %>%
+  drop_na(value) %>%
+  ggplot(aes(x = date, y = value, col = name)) +
+  geom_line(size = 0.8, alpha = 0.8) +
+  geom_hline(yintercept = 0) +
+  theme_test() +
+  scale_x_date(date_breaks = "1 years", date_labels = "%Y") +
+  labs(
+    title = "Variação acumulada do ano - Empresas Cearenses",
+    subtitle = paste0(
+      "Último valor Índice Laspeyres: ",
+      percent(last_row_laspeyres_acum_ano$acum_ano_laspeyres, 0.01, decimal.mark = ","),
+      " / Último valor Ibovespa: ",
+      percent(last_row_ibovespa_acum_ano$acum_ano_ibovespa, 0.01, decimal.mark = ","),
+      " / Mês de referência: ", str_to_sentence(format(last_row_laspeyres_acum_ano$date, "%B de %Y."))
+    ),
+    x = "", y = "", col = "",
+    caption = "Fonte: Yahoo finance. Elaboração: NUPE/UNIFOR."
+  ) +
+  theme(
+    plot.caption = element_text(hjust = 0),
+    legend.position = c(0.1, 0.9),
+    legend.text = element_text(size = 12),
+    legend.key = element_rect(fill = "white", colour = "black"),
+    legend.title = element_text(face = "bold"),
+    legend.key.width =  unit(1.5, "lines")
+  )
+
+g6
 
 # Acumulado dos últimos 12 meses
 
@@ -779,7 +877,7 @@ last_row_ibovespa_12_meses <- indice_mensal_df %>%
   tail(1) %>%
   select(date, acum_12_ibovespa)
 
-g6 <- indice_mensal_df %>%
+g7 <- indice_mensal_df %>%
   select(date, acum_12_laspeyres, acum_12_ibovespa) %>%
   pivot_longer(!date) %>%
   mutate(
@@ -820,27 +918,58 @@ g6 <- indice_mensal_df %>%
     legend.key.width =  unit(1.5, "lines")
   )
 
-g6
+g7
 
-# Save data ---------------------------------------------------------------
+# Formatando base de dados para output ------------------------------------
 
 # Dadods em formato wide
+
+## Preço de fechamento
 
 empresas_df.wide <- empresas_df  %>%
   select(-volume) %>%
   pivot_wider(
     names_from = ticker,
-    values_from = price.close
+    values_from = price.close,
+    values_fn = sum
   ) %>%
   arrange(date)
 
+# Volume
+
+empresas_df_diario_long <- empresas_df  %>%
+  select(-price.close) %>%
+  pivot_wider(
+    names_from = ticker,
+    values_from = volume,
+    values_fn = sum
+  ) %>%
+  arrange(date) %>%
+  pivot_longer(
+    !date,
+    names_to = 'ticker',
+    values_to = 'volume'
+  )
+
+empresas_diario_long <- empresas_df.wide %>%
+  pivot_longer(
+    !date,
+    names_to = 'ticker',
+    values_to = 'price.close'
+  ) %>%
+  left_join(empresas_df_diario_long, by = c('date', 'ticker')) %>%
+  filter(price.close > 0)
+
 # Dados Mensais
+
+## Preço de Fechamento
 
 empresas_mensal_df <- empresas_df %>%
   select(-volume) %>%
   pivot_wider(
     names_from = ticker,
-    values_from = price.close
+    values_from = price.close,
+    values_fn = sum
   ) %>%
   group_by(month = month(date), year = year(date)) %>%
   slice(which.max(day(date))) %>%
@@ -851,15 +980,51 @@ empresas_mensal_df <- empresas_df %>%
   ) %>%
   arrange(date)
 
+## Volume
+
+empresas_mensal_df_vol <- empresas_df %>%
+  select(-price.close) %>%
+  pivot_wider(
+    names_from = ticker,
+    values_from = volume,
+    values_fn = sum
+  ) %>%
+  group_by(month = month(date), year = year(date)) %>%
+  slice(which.max(day(date))) %>%
+  ungroup() %>%
+  select(-month, -year) %>%
+  mutate(
+    date = ymd(paste0(str_sub(date, end = 7), "01"))
+  ) %>%
+  arrange(date) %>%
+  pivot_longer(
+    !date,
+    names_to = 'ticker',
+    values_to = 'volume'
+  )
+
+
+empresas_mensal_long <- empresas_mensal_df %>%
+  pivot_longer(
+    !date,
+    names_to = 'ticker',
+    values_to = 'price.close'
+  ) %>%
+  left_join(empresas_mensal_df_vol, by = c('date', 'ticker')) %>%
+  filter(price.close > 0)
+
+# Save data ---------------------------------------------------------------
 
 write_xlsx(
   list(
     'indice_mensal' = indice_mensal_df,
     "indice_diario" = indice_df,
-    "base_mensal_price.close" = empresas_mensal_df %>% filter(date >= "2012-12-01"),
-    "base_diaria_price.close" = empresas_df.wide %>% filter(date >= "2012-12-29"),
+    "base_mensal_price.close" = empresas_mensal_df %>% filter(date >= "2012-01-01"),
+    "base_diaria_price.close" = empresas_df.wide %>% filter(date >= "2011-12-29"),
+    'base_mensal_long' = empresas_mensal_long %>% filter(date >= "2012-01-01"),
+    'base_diaria_long' = empresas_diario_long %>% filter(date >= "2011-12-29"),
     "price.closeXpesos" = empresas_ce %>% filter(peso > 0),
-    "cambio_PTXA" = cambio,
+    "cambio_PTXA" = cambio %>% rename(cambio_ptax = cambio),
     "pesos_atuais" = pesos
   ),
   "out/indice_nupe.xlsx"
@@ -867,31 +1032,30 @@ write_xlsx(
 
 ggsave(
   filename = "g1.png",
-  plot = g1,
+  plot = g1 + ggeasy::easy_all_text_color('black'),
   device = "png",
   path = "figs",
-  dpi = 600,
-  width = 40,
-  height = 15,
-  units = "cm"
+  dpi = 300,
+  width = 15,
+  height = 7,
 )
 
 ggsave(
   filename = "g2.png",
-  plot = g2,
+  plot = g2 + ggeasy::easy_all_text_color('black'),
   device = "png",
   path = "figs",
-  dpi = 600,
+  dpi = 300,
   width = 15,
   height = 7
 )
 
 ggsave(
   filename = "g3.png",
-  plot = g3,
+  plot = g3 + ggeasy::easy_all_text_color('black'),
   device = "png",
   path = "figs",
-  dpi = 600,
+  dpi = 300,
   width = 15,
   height = 7
 )
@@ -899,32 +1063,40 @@ ggsave(
 
 ggsave(
   filename = "g4.png",
-  plot = g4,
+  plot = g4 + ggeasy::easy_all_text_color('black'),
   device = "png",
   path = "figs",
-  dpi = 600,
-  width = 40,
-  height = 15,
-  units = "cm"
+  dpi = 300,
+  width = 15,
+  height = 7
 )
-
 
 ggsave(
   filename = "g5.png",
-  plot = g5,
+  plot = g5 + ggeasy::easy_all_text_color('black'),
   device = "png",
   path = "figs",
-  dpi = 600,
+  dpi = 300,
   width = 15,
   height = 7
 )
 
 ggsave(
   filename = "g6.png",
-  plot = g6,
+  plot = g6 + ggeasy::easy_all_text_color('black'),
   device = "png",
   path = "figs",
-  dpi = 600,
+  dpi = 300,
+  width = 15,
+  height = 7
+)
+
+ggsave(
+  filename = "g7.png",
+  plot = g7 + ggeasy::easy_all_text_color('black'),
+  device = "png",
+  path = "figs",
+  dpi = 300,
   width = 15,
   height = 7
 )
