@@ -82,7 +82,6 @@ empresas_df <- empresas_df %>%
   rename(date = ref.date) %>%
   arrange(date)
 
-
 # Empresas internacionais
 
 empresas.ce_internacional <- BatchGetSymbols(
@@ -433,6 +432,13 @@ indice_laspeyres <- priceIndex(t,
            indexMethod = "laspeyres",
            output = "chained")
 
+valor_portifolio <- values(t,
+       pvar = 'price.close',
+       qvar = 'peso',
+       pervar = 'cdg_date',
+       prodID = 'ticker'
+       )
+
 
 # data_indice <- data_indice[data_indice >= inicial.date_indice]
 
@@ -441,9 +447,22 @@ indice_df <- tibble(
   indice_laspeyres = as.numeric(indice_laspeyres)*100
 )
 
+
+valor_portifolio_df <- tibble(
+  date = data_indice$date,
+  valor_portifolio = as.numeric(valor_portifolio)
+)
+
+
+valor_portifolio_df <- valor_portifolio_df %>%
+  drop_na(valor_portifolio) %>%
+  mutate(indice = (valor_portifolio/first(valor_portifolio))*100)
+
 # IbovespaXIndice ---------------------------------------------------------
 
 # Base de Dados diária
+
+## Índice de preços
 
 indice_df <- indice_df %>%
   left_join(ibovespa_df, by = "date") %>%
@@ -457,6 +476,22 @@ indice_df <- indice_df %>%
     var_52_semanas_ibovespa = (ibovespa/lag(ibovespa, 52) - 1)
   ) %>%
   relocate(var_diaria_ibovespa, .after = var_diaria_laspeyres)
+
+# Índice de valor
+
+valor_portifolio_df <- valor_portifolio_df %>%
+  left_join(ibovespa_df, by = "date") %>%
+  select(-volume, -ticker) %>%
+  rename(ibovespa = price.close) %>%
+  mutate(
+    var_diaria_indice = (indice/lag(indice) - 1),
+    var_52_semanas_indice = (indice/lag(indice, 52) - 1),
+    ibovespa = (ibovespa/dplyr::first(ibovespa))*100,
+    var_diaria_ibovespa = (ibovespa/lag(ibovespa) - 1),
+    var_52_semanas_ibovespa = (ibovespa/lag(ibovespa, 52) - 1)
+  ) %>%
+  relocate(var_diaria_ibovespa, .after = var_diaria_indice)
+
 
 # Base de dados Mensal
 
@@ -476,6 +511,24 @@ indice_mensal_df <- indice_df %>%
     acum_12_ibovespa = (ibovespa/lag(ibovespa, 12) - 1)
   )
 
+
+valor_portifolio_mensal_df <- valor_portifolio_df %>%
+  select(date, valor_portifolio, indice, ibovespa) %>%
+  group_by(month = month(date), year = year(date)) %>%
+  slice(which.max(day(date))) %>%
+  ungroup() %>%
+  select(-month, -year) %>%
+  arrange(date) %>%
+  mutate(
+    date = ymd(paste0(str_sub(date, end = 7), "01")),
+    var_mensal_indice = (indice/lag(indice) - 1),
+    acum_12_indice = (indice/lag(indice, 12) - 1),
+    ibovespa = (ibovespa/dplyr::first(ibovespa))*100,
+    var_mensal_ibovespa = (ibovespa/lag(ibovespa) - 1),
+    acum_12_ibovespa = (ibovespa/lag(ibovespa, 12) - 1)
+  )
+
+
 # Calculando o acumulado do ano
 
 tx_variacao <- indice_mensal_df %>%
@@ -484,7 +537,6 @@ tx_variacao <- indice_mensal_df %>%
   mutate(
     var_mensal_laspeyres = 1 + var_mensal_laspeyres,
     var_mensal_ibovespa = 1 + var_mensal_ibovespa
-
     ) %>%
   group_by(year(date)) %>%
   summarise(
@@ -510,51 +562,38 @@ indice_mensal_df <- indice_mensal_df %>%
   relocate(var_mensal_ibovespa, .after = var_mensal_laspeyres) %>%
   relocate(c(acum_12_laspeyres, acum_12_ibovespa), .after = last_col())
 
-# Calculando valor do portifólio ------------------------------------------
+# Cálculo para o índice de valor
 
-# Transformando base em matriz
-
-empresas_matrix <- empresas_df %>%
-  filter(ticker != "Ibovespa", !date %in% remover_data, date != "2020-11-20") %>%
-  select(-volume) %>%
-  pivot_wider(
-    names_from = ticker,
-    values_from = price.close,
-    values_fn = sum
-  ) %>% arrange(date) %>%
-  mutate_if(is.numeric, ~ifelse(is.na(.), 0, .)) %>%
-  as.matrix()
-
-data <- empresas_matrix[,1]
-
-rownames(empresas_matrix) <- empresas_matrix[,1]
-empresas_matrix <- empresas_matrix[,-1]
-
-# Trnasformando pesos em matriz
-
-pesos_matrix <- as.matrix(pesos$peso_padronizado)
-
-# Calculando Valor do portifolio
-
-empresas_matrix <- apply(empresas_matrix, 2, as.numeric)
-
-valor_portifolio <- empresas_matrix %*% (pesos_matrix*100)
-
-rownames(valor_portifolio) <- data
-
-valor_portifolio <- tibble(
-  date = rownames(valor_portifolio),
-  valor_portifolio = as.numeric(valor_portifolio)
-)
-
-valor_portifolio <- valor_portifolio %>%
-  filter(valor_portifolio > 0) %>%
+tx_variacao_valor <- valor_portifolio_mensal_df %>%
+  select(date, var_mensal_indice, var_mensal_ibovespa) %>%
+  drop_na() %>%
   mutate(
-    var_diaria = valor_portifolio/lag(valor_portifolio, n = 1) - 1,
-    var_anual = valor_portifolio/lag(valor_portifolio, n = 12) - 1,
-    date = ymd(date)
-    )
+    var_mensal_indice = 1 + var_mensal_indice,
+    var_mensal_ibovespa = 1 + var_mensal_ibovespa
+  ) %>%
+  group_by(year(date)) %>%
+  summarise(
+    acum_ano_indice = cumprod(var_mensal_indice) - 1,
+    acum_ano_ibovespa = cumprod(var_mensal_ibovespa) - 1
+  ) %>%
+  ungroup() %>%
+  janitor::clean_names()
 
+data_tx_variacao <- valor_portifolio_mensal_df %>%
+  drop_na(var_mensal_indice) %>%
+  pull(date)
+
+tx_variacao_valor$date <- data_tx_variacao
+
+
+tx_variacao_valor <- tx_variacao_valor %>%
+  select(-year_date) %>%
+  relocate(date)
+
+valor_portifolio_mensal_df <- valor_portifolio_mensal_df %>%
+  left_join(tx_variacao_valor, by = 'date') %>%
+  relocate(var_mensal_ibovespa, .after = var_mensal_indice) %>%
+  relocate(c(acum_12_indice, acum_12_ibovespa), .after = last_col())
 
 # Gráficos diários --------------------------------------------------------
 
@@ -608,7 +647,7 @@ g1 <- indice_df %>%
     legend.key.width =  unit(1.5, "lines")
   )
 
-g1 + ggeasy::easy_all_text_color('black')
+g1
 
 # Variação diária
 
@@ -920,6 +959,370 @@ g7 <- indice_mensal_df %>%
 
 g7
 
+# Gráficos diários - Índice de valor --------------------------------------
+
+# ìndice diário
+
+last_row_indice_valor <- valor_portifolio_df %>%
+  tail(1) %>%
+  select(date, indice)
+
+
+last_row_ibovespa_ind_valor <- valor_portifolio_df %>%
+  tail(1) %>%
+  select(date, ibovespa)
+
+g8 <- valor_portifolio_df %>%
+  select(date, indice, ibovespa) %>%
+  pivot_longer(!date) %>%
+  mutate(
+    name = factor(
+      name,
+      levels = c("indice", "ibovespa")
+    ),
+    name = fct_recode(
+      name,
+      "Ibovespa" = "ibovespa",
+      "Índice Valor do Portifólio" = "indice"
+    )
+  ) %>%
+  ggplot(aes(x = date, y = value, col = name)) +
+  geom_line(size = 0.7, alpha = 0.8) +
+  theme_test() +
+  scale_x_date(date_breaks = "1 years", date_labels = "%Y") +
+  labs(
+    title = "Índice Diário das Empresas Cearenses Listadas em Bolsa de Valores.",
+    subtitle = paste0(
+      "Último valor do Índice: ",
+      round(last_row_indice_valor$indice, digits = 2),
+      " / Último valor Ibovespa: ",
+      round(last_row_ibovespa_ind_valor$ibovespa, digits = 2),
+      " / Data de referência: ", format(last_row_indice_valor$date, "%d de %B de %Y.")
+    ),
+    x = "", y = "", col = "",
+    caption = "Fonte: Yahoo finance. Elaboração: NUPE/UNIFOR."
+  ) +
+  theme(
+    plot.caption = element_text(hjust = 0),
+    legend.position = c(0.15, 0.7),
+    legend.text = element_text(size = 12),
+    legend.key = element_rect(fill = "white", colour = "black"),
+    legend.title = element_text(face = "bold"),
+    legend.key.width =  unit(1.5, "lines")
+  )
+
+g8
+
+
+
+last_row_indice_valor_var <- valor_portifolio_df %>%
+  tail(1) %>%
+  select(date, var_diaria_indice)
+
+last_row_ibovespa_var_indice_valor <- valor_portifolio_df %>%
+  tail(1) %>%
+  select(date, var_diaria_ibovespa)
+
+g9 <- valor_portifolio_df %>%
+  drop_na() %>%
+  select(date, var_diaria_indice, var_diaria_ibovespa) %>%
+  pivot_longer(!date) %>%
+  mutate(
+    name = factor(
+      name,
+      levels = c("var_diaria_indice", "var_diaria_ibovespa")
+    ),
+    name = fct_recode(
+      name,
+      "Ibovespa" = "var_diaria_ibovespa",
+      "Índice Valor do Portifólio" = "var_diaria_indice"
+    )
+  ) %>%
+  ggplot(aes(x = date, y = value, col = name)) +
+  geom_line(size = 0.7, alpha = 0.8) +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(labels = percent_format(0.1, decimal.mark = ",", big.mark = ".")) +
+  facet_wrap(~name, nrow = 2, scales = "free") +
+  theme_test() +
+  scale_x_date(date_breaks = "1 years", date_labels = "%Y") +
+  labs(
+    title = "Variação diária - Empresas Cearenses.",
+    subtitle = paste0(
+      "Último valor do Índice: ",
+      percent(last_row_indice_valor_var$var_diaria_indice, 0.01, decimal.mark = ",", big.mark = "."),
+      " / Último valor Ibovespa: ",
+      percent(last_row_ibovespa_var_indice_valor$var_diaria_ibovespa, 0.01, decimal.mark = ",", big.mark = "."),
+      " / Data de referência: ", format(last_row_indice_valor_var$date, "%d de %B de %Y.")
+    ),
+    x = "", y = "", col = "",
+    caption = "Fonte: Yahoo finance. Elaboração: NUPE/UNIFOR."
+  ) +
+  theme(
+    plot.caption = element_text(hjust = 0),
+    legend.position = "none"
+  )
+
+g9
+
+# Variação 52 semanas
+
+last_row_indice_var_52 <- valor_portifolio_df %>%
+  tail(1) %>%
+  select(date, var_52_semanas_indice)
+
+last_row_ibovespa_var_52_valor <- valor_portifolio_df %>%
+  tail(1) %>%
+  select(date, var_52_semanas_ibovespa)
+
+g10 <- valor_portifolio_df %>%
+  drop_na() %>%
+  select(date, var_52_semanas_indice, var_52_semanas_ibovespa) %>%
+  pivot_longer(!date) %>%
+  mutate(
+    name = factor(
+      name,
+      levels = c("var_52_semanas_indice", "var_52_semanas_ibovespa")
+    ),
+    name = fct_recode(
+      name,
+      "Ibovespa" = "var_52_semanas_ibovespa",
+      "Índice Valor do Portifólio" = "var_52_semanas_indice"
+    )
+  ) %>%
+  ggplot(aes(x = date, y = value, col = name)) +
+  geom_line(size = 0.7, alpha = 0.8) +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(labels = percent_format(0.1, decimal.mark = ",", big.mark = ".")) +
+  facet_wrap(~name, nrow = 2, scales = "free") +
+  theme_test() +
+  scale_x_date(date_breaks = "1 years", date_labels = "%Y") +
+  labs(
+    title = "Variação (52 semanas) - Empresas Cearenses.",
+    subtitle = paste0(
+      "Último valor do Índice: ",
+      percent(last_row_indice_var_52$var_52_semanas_indice, 0.01, decimal.mark = ",", big.mark = "."),
+      " / Último valor Ibovespa: ",
+      percent(last_row_ibovespa_var_52_valor$var_52_semanas_ibovespa, 0.01, decimal.mark = ",", big.mark = "."),
+      " / Data de referência: ", format(last_row_indice_var_52$date, "%d de %B de %Y.")
+    ),
+    x = "", y = "", col = "",
+    caption = "Fonte: Yahoo finance. Elaboração: NUPE/UNIFOR."
+  ) +
+  theme(
+    plot.caption = element_text(hjust = 0),
+    legend.position = "none"
+  )
+
+g10
+
+# Gráficos mensais - Índice de valor --------------------------------------
+
+# ìndice Mensal
+
+g11 <- valor_portifolio_mensal_df %>%
+  select(date, indice, ibovespa) %>%
+  pivot_longer(!date) %>%
+  mutate(
+    name = factor(
+      name,
+      levels = c("indice", "ibovespa")
+    ),
+    name = fct_recode(
+      name,
+      "Ibovespa" = "ibovespa",
+      "Índice Valor do Portifólio" = "indice"
+    )
+  ) %>%
+  ggplot(aes(x = date, y = value, col = name)) +
+  geom_line(size = 0.8, alpha = 0.8) +
+  theme_test() +
+  scale_x_date(date_breaks = "1 years", date_labels = "%Y") +
+  labs(
+    title = "Índice Mensal das Empresas Cearenses Listadas em Bolsa de Valores.",
+    subtitle = paste0(
+      "Último valor do Índice: ",
+      round(last_row_indice_valor$indice, digits = 2),
+      " / Último valor Ibovespa: ",
+      round(last_row_ibovespa_ind_valor$ibovespa, digits = 2),
+      " / Mês de referência: ", str_to_sentence(format(last_row_indice_valor$date, "%B de %Y."))
+    ),
+    x = "", y = "", col = "",
+    caption = "Fonte: Yahoo finance. Elaboração: NUPE/UNIFOR."
+  ) +
+  theme(
+    plot.caption = element_text(hjust = 0),
+    legend.position = c(0.15, 0.7),
+    legend.text = element_text(size = 12),
+    legend.key = element_rect(fill = "white", colour = "black"),
+    legend.title = element_text(face = "bold"),
+    legend.key.width =  unit(1.5, "lines")
+  )
+
+g11
+
+# variação Mensal
+
+last_row_valor_mensal <- valor_portifolio_mensal_df %>%
+  tail(1) %>%
+  select(date, var_mensal_indice)
+
+
+last_row_ibovespa_mensal_valor <- indice_mensal_df %>%
+  tail(1) %>%
+  select(date, var_mensal_ibovespa)
+
+g12 <- valor_portifolio_mensal_df %>%
+  select(date, var_mensal_indice, var_mensal_ibovespa) %>%
+  pivot_longer(!date) %>%
+  mutate(
+    name = factor(
+      name,
+      levels = c("var_mensal_indice", "var_mensal_ibovespa")
+    ),
+    name = fct_recode(
+      name,
+      "Ibovespa" = "var_mensal_ibovespa",
+      "Índice Valor do Portifólio" = "var_mensal_indice"
+    )
+  ) %>%
+  drop_na(value) %>%
+  ggplot(aes(x = date, y = value, col = name)) +
+  geom_line(size = 0.8, alpha = 0.8) +
+  geom_hline(yintercept = 0) +
+  theme_test() +
+  scale_x_date(date_breaks = "1 years", date_labels = "%Y") +
+  scale_y_continuous(labels = percent_format(0.1, decimal.mark = ",", big.mark = ".")) +
+  facet_wrap(~name, nrow = 2, scales = "free") +
+  labs(
+    title = "Variação mensal - Empresas Cearenses.",
+    subtitle = paste0(
+      "Último valor do Índice : ",
+      percent(last_row_valor_mensal$var_mensal_indice, 0.01, decimal.mark = ","),
+      " / Último valor Ibovespa: ",
+      percent(last_row_ibovespa_mensal_valor$var_mensal_ibovespa, 0.01, decimal.mark = ","),
+      " / Mês de referência: ", str_to_sentence(format(last_row_valor_mensal$date, "%B de %Y."))
+    ),
+    x = "", y = "", col = "",
+    caption = "Fonte: Yahoo finance. Elaboração: NUPE/UNIFOR."
+  ) +
+  theme(
+    plot.caption = element_text(hjust = 0),
+    legend.position = 'none',
+    legend.text = element_text(size = 12),
+    legend.key = element_rect(fill = "white", colour = "black"),
+    legend.title = element_text(face = "bold"),
+    legend.key.width =  unit(1.5, "lines")
+  )
+
+g12
+
+# Acumulado do ano
+
+last_row_indice_acum_ano <- valor_portifolio_mensal_df %>%
+  tail(1) %>%
+  select(date, acum_ano_indice)
+
+last_row_ibovespa_acum_ano_valor <- valor_portifolio_mensal_df %>%
+  tail(1) %>%
+  select(date, acum_ano_ibovespa)
+
+g13 <- valor_portifolio_mensal_df %>%
+  select(date, acum_ano_indice, acum_ano_ibovespa) %>%
+  pivot_longer(!date) %>%
+  mutate(
+    name = factor(
+      name,
+      levels = c("acum_ano_indice", "acum_ano_ibovespa")
+    ),
+    name = fct_recode(
+      name,
+      "Ibovespa" = "acum_ano_ibovespa",
+      "Índice Valor do Portifólio" = "acum_ano_indice"
+    )
+  ) %>%
+  drop_na(value) %>%
+  ggplot(aes(x = date, y = value, col = name)) +
+  geom_line(size = 0.8, alpha = 0.8) +
+  geom_hline(yintercept = 0) +
+  theme_test() +
+  scale_x_date(date_breaks = "1 years", date_labels = "%Y") +
+  labs(
+    title = "Variação acumulada do ano - Empresas Cearenses",
+    subtitle = paste0(
+      "Último valor do Índice: ",
+      percent(last_row_indice_acum_ano$acum_ano_indice, 0.01, decimal.mark = ","),
+      " / Último valor Ibovespa: ",
+      percent(last_row_ibovespa_acum_ano_valor$acum_ano_ibovespa, 0.01, decimal.mark = ","),
+      " / Mês de referência: ", str_to_sentence(format(last_row_indice_acum_ano$date, "%B de %Y."))
+    ),
+    x = "", y = "", col = "",
+    caption = "Fonte: Yahoo finance. Elaboração: NUPE/UNIFOR."
+  ) +
+  theme(
+    plot.caption = element_text(hjust = 0),
+    legend.position = c(0.1, 0.9),
+    legend.text = element_text(size = 12),
+    legend.key = element_rect(fill = "white", colour = "black"),
+    legend.title = element_text(face = "bold"),
+    legend.key.width =  unit(1.5, "lines")
+  )
+
+g13
+
+# Acumulado dos últimos 12 meses
+
+last_row_indice_12_meses <- valor_portifolio_mensal_df %>%
+  tail(1) %>%
+  select(date, acum_12_indice)
+
+
+last_row_ibovespa_12_meses_valor <- valor_portifolio_mensal_df %>%
+  tail(1) %>%
+  select(date, acum_12_ibovespa)
+
+g14 <- valor_portifolio_mensal_df %>%
+  select(date, acum_12_indice, acum_12_ibovespa) %>%
+  pivot_longer(!date) %>%
+  mutate(
+    name = factor(
+      name,
+      levels = c("acum_12_indice", "acum_12_ibovespa")
+    ),
+    name = fct_recode(
+      name,
+      "Ibovespa" = "acum_12_ibovespa",
+      "Índice Valor do Portifólio" = "acum_12_indice"
+    )
+  ) %>%
+  drop_na(value) %>%
+  ggplot(aes(x = date, y = value, col = name)) +
+  geom_line(size = 0.8, alpha = 0.8) +
+  geom_hline(yintercept = 0) +
+  theme_test() +
+  scale_x_date(date_breaks = "1 years", date_labels = "%Y") +
+  labs(
+    title = "Variação acumulada dos útlimos 12 meses - Empresas Cearenses",
+    subtitle = paste0(
+      "Último valor do Índice: ",
+      percent(last_row_indice_12_meses$acum_12_indice, 0.01, decimal.mark = ","),
+      " / Último valor Ibovespa: ",
+      percent(last_row_ibovespa_12_meses_valor$acum_12_ibovespa, 0.01, decimal.mark = ","),
+      " / Mês de referência: ", str_to_sentence(format(last_row_indice_12_meses$date, "%B de %Y."))
+    ),
+    x = "", y = "", col = "",
+    caption = "Fonte: Yahoo finance. Elaboração: NUPE/UNIFOR."
+  ) +
+  theme(
+    plot.caption = element_text(hjust = 0),
+    legend.position = c(0.1, 0.9),
+    legend.text = element_text(size = 12),
+    legend.key = element_rect(fill = "white", colour = "black"),
+    legend.title = element_text(face = "bold"),
+    legend.key.width =  unit(1.5, "lines")
+  )
+
+g14
+
 # Formatando base de dados para output ------------------------------------
 
 # Dadods em formato wide
@@ -1019,6 +1422,8 @@ write_xlsx(
   list(
     'indice_mensal' = indice_mensal_df,
     "indice_diario" = indice_df,
+    'indice_valor_portifolio' = valor_portifolio_df,
+    'indice_valor_portifolio_mensal' = valor_portifolio_mensal_df,
     "base_mensal_price.close" = empresas_mensal_df %>% filter(date >= "2012-01-01"),
     "base_diaria_price.close" = empresas_df.wide %>% filter(date >= "2011-12-29"),
     'base_mensal_long' = empresas_mensal_long %>% filter(date >= "2012-01-01"),
@@ -1100,3 +1505,80 @@ ggsave(
   width = 15,
   height = 7
 )
+
+ggsave(
+  filename = "g8.png",
+  plot = g8 + ggeasy::easy_all_text_color('black'),
+  device = "png",
+  path = "figs",
+  dpi = 300,
+  width = 15,
+  height = 7
+)
+
+ggsave(
+  filename = "g9.png",
+  plot = g9 + ggeasy::easy_all_text_color('black'),
+  device = "png",
+  path = "figs",
+  dpi = 300,
+  width = 15,
+  height = 7
+)
+
+
+ggsave(
+  filename = "g10.png",
+  plot = g10 + ggeasy::easy_all_text_color('black'),
+  device = "png",
+  path = "figs",
+  dpi = 300,
+  width = 15,
+  height = 7
+)
+
+
+ggsave(
+  filename = "g11.png",
+  plot = g11 + ggeasy::easy_all_text_color('black'),
+  device = "png",
+  path = "figs",
+  dpi = 300,
+  width = 15,
+  height = 7
+)
+
+
+ggsave(
+  filename = "g12.png",
+  plot = g12 + ggeasy::easy_all_text_color('black'),
+  device = "png",
+  path = "figs",
+  dpi = 300,
+  width = 15,
+  height = 7
+)
+
+ggsave(
+  filename = "g13.png",
+  plot = g13 + ggeasy::easy_all_text_color('black'),
+  device = "png",
+  path = "figs",
+  dpi = 300,
+  width = 15,
+  height = 7
+)
+
+ggsave(
+  filename = "g14.png",
+  plot = g14 + ggeasy::easy_all_text_color('black'),
+  device = "png",
+  path = "figs",
+  dpi = 300,
+  width = 15,
+  height = 7
+)
+
+
+
+
