@@ -1,0 +1,325 @@
+---
+title: "Empresas Cearenses na Bolsa de Valores"
+author: "Alysson Oliveira"
+date: "`r format(Sys.Date(), '%d/%m/%Y')`"
+output:
+  bookdown::pdf_document2:
+    toc: true
+    toc_depth: 3
+fontsize: 12pt
+geometry: right = 2cm, left = 3cm, top = 3cm, bottom = 2cm
+lang: pt-br
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+  - \usepackage{threeparttablex}
+  - \usepackage[normalem]{ulem}
+  - \usepackage{makecell}
+  - \usepackage{xcolor}
+  - \usepackage{floatrow}
+  - \floatsetup[figure]{capposition=top}
+  - \floatsetup[table]{capposition=top}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = F, 
+  message = F,
+  error = F, 
+  warning = F
+  )
+```
+
+```{r src, include=FALSE}
+
+source("src/indice_nupe.R", encoding = "UTF-8")
+
+```
+
+```{r packages}
+
+library(tidyverse)
+options(kableExtra.latex.load_packages = FALSE)
+library(kableExtra)
+library(BatchGetSymbols)
+library(quantmod)
+library(lubridate)
+library(scales)
+library(tidyquant)
+library(ggdendro)
+
+```
+
+```{r setup_kable}
+options(knitr.table.format = "latex")
+```
+
+```{r read_objects}
+
+tab <- read_rds("tabs/tab.rds")
+tab1 <- read_rds("tabs/tab1.rds")
+tab2 <- read_rds("tabs/tab2.rds")
+tab3 <- read_rds("tabs/tab3.rds")
+g1 <- read_rds("figs/g1.rds")
+g2 <- read_rds("figs/g2.rds")
+g3 <- read_rds("figs/g3.rds")
+g4 <- read_rds("figs/g4.rds")
+
+```
+
+```{r tickers_empresas, include=FALSE}
+international_ticker.ce <- c('ARCE')
+
+tickers.ce <- c(
+  "PGMN3.SA",
+  "BNBR3.SA",
+  'COCE3.SA',
+  'COCE5.SA',
+  "COCE6.SA",
+  'GRND3.SA',
+  'MDIA3.SA',
+  'HAPV3.SA'
+)
+
+inicial.date <- ymd('2015-01-01')
+final.date <- today()
+tresh_bad_data <- 0.01
+cache_folder <- 'data/cotacao'
+
+```
+
+```{r empresas_cearenses, include=F}
+
+getSymbols(tickers.ce, from = inicial.date, periodicity = "monthly")
+getSymbols(international_ticker.ce, from = inicial.date, periodicity = "monthly")
+getSymbols("^BVSP", src = "yahoo", from = inicial.date) # Ibovespa
+
+getSymbols("PGMN3.SA", from = inicial.date)
+
+
+```
+
+\newpage
+
+# Empresas Cearenses Selecionadas
+
+```{r tab}
+
+tab %>% 
+  kbl(
+    format = "latex",
+    digits = 2,
+    caption = "Empresas cearenses listadas na bolsa de Valores de São Paulo (B3).",
+    booktabs = T,
+    row.names = T
+  ) %>%
+  kable_styling(
+    latex_options = c("hold_position", "scale_down")
+  ) %>%
+  row_spec(0, bold = TRUE, align = "c") %>%
+  footnote(
+    general = "Fonte: Comissão de valores Mobiliários (CVM). Elaboração: NUPE/Unifor",
+    general_title = ""
+  )
+ # group_rows(start_row = 0, end_row = 6) %>% 
+ #  group_rows(start_row = 7, end_row = 9) %>% 
+ #  group_rows(start_row = 10, end_row = 15)
+
+```
+
+Os requisitos para a escolha das empresas foram: 1) Ter sua sede no estado do Ceará e 2) possuir capital aberto em bolsa de valores. As empresas que se encaixaram nesses requisitos são as listadas abaixo na Tabela \@ref(tab:tab1).
+
+```{r tab1}
+
+tab1 %>% 
+  rename(
+    "Ticker" = ticker,
+    Obs. = total.obs,
+    "Volume Médio" = volume_mean,
+    "Preço Médio" = price.adjusted_mean,
+    "Rentabilidade Média (%)" = ret.adjusted.prices_mean
+  ) %>% 
+  kbl(
+    digits = 2,
+    caption = "Empresas cearenses listadas em bolsa.",
+    booktabs = T,
+    format.args = list(
+      big.mark = ".", decimal.mark = ","
+    ),
+    row.names = F,
+    longtable = T
+  ) %>% 
+  kable_styling(
+    latex_options = c("hold_position", "striped")
+  ) %>% 
+  row_spec(0, bold = TRUE, align = "c") %>% 
+  column_spec(1, bold = T) %>%
+  footnote(
+    general = "Fonte: Yahoo Finance. Elaboração: NUPE/Unifor",
+    general_title = ""
+  )
+
+```
+
+A tabela acima apresenta as médias diárias dos dados de *volume, preço e retorno das ações*. Seis empresas foram escolhidas, cinco com capital aberto nacionalmente na bolsa de São Paulo (B3) e uma na NASDAQ. 
+
+A empresa com maior volume e retorno médio diário foi a **HAPV3**, com certa de 2 milhões de negociações diárias em média e um retorno de 0,18% a.d. A hapvida é a única empresa que rompeu os preços pré-pandemia, como pode ser visto no Gráfico \@ref(fig:g1).
+
+```{r g1, fig.cap="Preços diários das empresas cearenses em bolsas de valores.", fig.height=5, fig.width=8, fig.align='left', dpi=120}
+
+g1 + 
+    labs(
+    caption = "Fonte: Yahoo Finance. Elaboração: NUPE/Unifor."
+  ) + 
+  theme(
+    plot.caption = element_text(hjust = 0),
+    plot.caption.position = "plot"
+  )
+
+```
+
+A Pague Menos (**PGMN3**) é a empresa com a menor quantidade de observações pelo fato de ser a empresa que abriu capital mais recentemente na bolsa de valores (B3) no dia 4 de setembro de 2020. O Gráfico \@ref(fig:g2) apresenta a variação do preço diário dela. 
+
+```{r g2, fig.height=3, fig.width=7, fig.cap="Cotação diária da Pague Menos na bolsas de valores.", fig.align='left'}
+
+g2 + 
+    labs(
+    caption = "Fonte: Yahoo Finance. Elaboração: NUPE/Unifor."
+  ) + 
+  theme(
+    plot.caption = element_text(hjust = 0),
+    plot.caption.position = "plot"
+  )
+
+```
+
+Na Tabela \@ref(tab:tab2), é apresentado o retorno anual retorno das empresas cearenses.
+
+```{r tab2}
+
+largura_coluna <- "0.9in"
+
+tab2 %>%
+  kbl(
+    digits = 2,
+    caption = "Rentabilidade anual das empresas cearenses listadas em bolsa.",
+    booktabs = T,
+    format.args = list(
+    big.mark = ".", decimal.mark = ","
+    )
+  ) %>%
+  kable_styling(
+  latex_options = c("hold_position", "striped"),
+  full_width = T
+  ) %>%
+  row_spec(0, bold = TRUE, color = "black") %>% 
+  column_spec(1, color = "black", bold = T) %>%
+  column_spec(2, color = ifelse(tab2$`2016` < 0, "red", "black"), width = largura_coluna, latex_valign = "m") %>% 
+  column_spec(3, color = ifelse(tab2$`2017` < 0, "red", "black"), width = largura_coluna, latex_valign = "m") %>% 
+  column_spec(4, color = ifelse(tab2$`2018` < 0, "red", "black"), width = largura_coluna, latex_valign = "m") %>% 
+  column_spec(5, color = ifelse(tab2$`2019` < 0, "red", "black"), width = largura_coluna, latex_valign = "m") %>% 
+  column_spec(6, color = ifelse(tab2$`2020` < 0, "red", "black"), width = largura_coluna, latex_valign = "m") %>% 
+  footnote(
+  general = "Fonte: Yahoo Finance. Elaboração: NUPE/Unifor",
+  general_title = ""
+  )
+
+```
+
+## Evolução das empresas cearenses
+
+
+
+### Pague Menos
+
+```{r}
+
+chart_Series(PGMN3.SA)
+
+```
+
+### Banco do Nordeste
+
+```{r}
+
+chartSeries(BNBR3.SA, theme = 'white', type = "line")
+
+```
+
+### Coelce
+
+```{r}
+
+chartSeries(COCE5.SA, theme = 'white', type = "line")
+
+```
+
+### Grendene
+
+```{r}
+
+chartSeries(GRND3.SA, theme = 'white', type = "line")
+
+```
+
+### Hapvida
+
+```{r}
+
+chartSeries(HAPV3.SA, theme = 'white', type = "line")
+
+```
+
+### M. Dias Branco
+
+```{r}
+
+chartSeries(MDIA3.SA, theme = 'white', type = "line")
+
+```
+
+
+## Correlação entre as empresas
+
+Conforme abaixo na Figura \@ref(fig:g4)
+
+```{r g4, fig.cap='Correlação do retorno das empresas cearenses listadas em bolsa.', fig.height=7, fig.width=8}
+
+g4 + 
+  labs(
+    caption = "Fonte: Yahoo Finance. Elaboração: NUPE/Unifor."
+  ) + 
+  theme(
+    plot.caption = element_text(hjust = 0),
+    plot.caption.position = "plot"
+  )
+
+```
+
+
+## Análise de cluster
+
+Abaixo é espresso o dendograma dos retornos diários das ações cearenses em bolsa de valores. 
+
+```{r g3, fig.cap="Dendograma de ações cearenses em bolsas de valores - Retorno Diário (%).", fig.height=3, fig.width=5,}
+
+g3 + 
+  labs(
+    caption = "Fonte: Yahoo Finance. Elaboração: NUPE/Unifor."
+  ) + 
+  theme(
+    plot.caption = element_text(hjust = 0),
+    plot.caption.position = "plot"
+  )
+
+```
+
+
+
