@@ -1,41 +1,7 @@
 
 
-priceIndex(CES_sigma_2,
-           pvar = "prices",
-           qvar = "quantities",
-           pervar = "time",
-           prodID = "prodID",
-           indexMethod = "laspeyres",
-           output = "chained")
-
-
-priceIndex(CES_sigma_2,
-           pvar = "prices",
-           qvar = "quantities",
-           pervar = "time",
-           prodID = "prodID",
-           indexMethod = "laspeyres",
-           output = 'fixedBase')
-
-
-priceIndex(CES_sigma_2,
-           pvar = "prices",
-           qvar = "quantities",
-           pervar = "time",
-           prodID = "prodID",
-           indexMethod = "laspeyres",
-           output = "pop")
-
-
-valueDecomposition(CES_sigma_2,
-                   pvar = "prices",
-                   qvar = "quantities",
-                   prodID = "prodID",
-                   pervar = "time",
-                   priceMethod = "laspeyres")
-
-
-
+library(tidyverse)
+library(IndexNumR)
 
 # Exemplo
 
@@ -63,8 +29,7 @@ df %>%
     cols = commodity
   )
 
-library(tidyverse)
-library(IndexNumR)
+
 
 
 df2 <- tibble(

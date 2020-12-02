@@ -13,6 +13,7 @@ library(scales)
 library(GetBCBData)
 library(writexl)
 library(IndexNumR)
+library(tidyquant)
 
 # Parâmetros --------------------------------------------------------------
 
@@ -159,7 +160,6 @@ empresas_df <- empresas_df %>%
   drop_na(price.close) %>%
   bind_rows(ibovespa_df)
 
-
 # Retirando dados faltantes e datas comemorativas
 
 empresas_df_drop_feriados <- empresas_df %>%
@@ -171,7 +171,6 @@ empresas_df_drop_feriados <- empresas_df %>%
   ) %>%
   drop_na(Ibovespa) %>%
   arrange(date)
-
 
 data_indice <- empresas_df_drop_feriados$date
 
@@ -352,7 +351,6 @@ pesos_variaveis <- z %>%
     values_to = "peso"
   )
 
-
 # Consolidando base -------------------------------------------------------
 
 empresas_ce <- empresas_df %>%
@@ -392,7 +390,6 @@ t2 <- empresas_ce %>%
     values_to = "peso"
   )
 
-
 t <- t1  %>%
   left_join(t2, by = c("date", "ticker"))
 
@@ -414,8 +411,6 @@ t <- t %>%
     cdg_date = as.numeric(as_factor(as.character(date)))
   )
 
-
-
 data_indice <- t %>%
   select(-peso, -cdg_date) %>%
   pivot_wider(
@@ -423,14 +418,13 @@ data_indice <- t %>%
     values_from = price.close
   ) %>% select(date)
 
-
 indice_laspeyres <- priceIndex(t,
            pvar = "price.close",
            qvar = "peso",
            pervar = "cdg_date",
            prodID = "ticker",
            indexMethod = "laspeyres",
-           output = "chained")
+           output = "fixedBase")
 
 valor_portifolio <- values(t,
        pvar = 'price.close',
@@ -439,7 +433,6 @@ valor_portifolio <- values(t,
        prodID = 'ticker'
        )
 
-
 # data_indice <- data_indice[data_indice >= inicial.date_indice]
 
 indice_df <- tibble(
@@ -447,12 +440,10 @@ indice_df <- tibble(
   indice_laspeyres = as.numeric(indice_laspeyres)*100
 )
 
-
 valor_portifolio_df <- tibble(
   date = data_indice$date,
   valor_portifolio = as.numeric(valor_portifolio)
 )
-
 
 valor_portifolio_df <- valor_portifolio_df %>%
   drop_na(valor_portifolio) %>%
@@ -527,7 +518,6 @@ valor_portifolio_mensal_df <- valor_portifolio_df %>%
     var_mensal_ibovespa = (ibovespa/lag(ibovespa) - 1),
     acum_12_ibovespa = (ibovespa/lag(ibovespa, 12) - 1)
   )
-
 
 # Calculando o acumulado do ano
 
@@ -1013,8 +1003,6 @@ g8 <- valor_portifolio_df %>%
 
 g8
 
-
-
 last_row_indice_valor_var <- valor_portifolio_df %>%
   tail(1) %>%
   select(date, var_diaria_indice)
@@ -1406,7 +1394,6 @@ empresas_mensal_df_vol <- empresas_df %>%
     values_to = 'volume'
   )
 
-
 empresas_mensal_long <- empresas_mensal_df %>%
   pivot_longer(
     !date,
@@ -1416,14 +1403,103 @@ empresas_mensal_long <- empresas_mensal_df %>%
   left_join(empresas_mensal_df_vol, by = c('date', 'ticker')) %>%
   filter(price.close > 0)
 
+# Calculando beta do índice -----------------------------------------------
+
+# Beta diário
+
+beta_valor_portifolio <- valor_portifolio_mensal_df %>%
+  select(date, var_mensal_indice, var_mensal_ibovespa) %>%
+  drop_na() %>%
+  tq_performance(
+    Ra = var_mensal_indice,
+    Rb = var_mensal_ibovespa,
+    performance_fun = table.CAPM
+  )
+
+beta_valor_portifolio
+
+# Importando todas as cotações registradas
+
+empresas_portifolio <- tq_get(
+  c(
+    "PGMN3.SA",
+    "BNBR3.SA",
+    'COCE5.SA',
+    'GRND3.SA',
+    'MDIA3.SA',
+    'HAPV3.SA',
+    'ARCE'
+  ),
+  from = inicial.date_indice,
+  to = today()
+)
+
+# Benchmark
+
+ibovespa <- tq_get('^BVSP', from = inicial.date_indice, to = today())
+
+# Calculando o retorno anual das empresas
+
+
+ret_emp <- empresas_portifolio %>%
+  group_by(symbol) %>%
+  tq_transmute(
+    select = adjusted,
+    mutate_fun = periodReturn,
+    period = 'monthly',
+    type = 'arithmetic',
+    col_rename = 'ret_mensal'
+  )
+
+
+# Calculando o retorno anual do Ibovespa
+
+ret_ibov <- ibovespa %>%
+  tq_transmute(
+    select = adjusted,
+    mutate_fun = periodReturn,
+    period = 'monthly',
+    type = 'arithmetic',
+    col_rename = 'ret_mensal_benc'
+  )
+
+RaRb <- left_join(ret_emp, ret_ibov, by = c("date" = "date"))
+
+RaRb <- RaRb %>% na.omit()
+
+RaRb_capm <- RaRb %>%
+  tq_performance(Ra = ret_mensal,
+                 Rb = ret_mensal_benc,
+                 performance_fun = table.CAPM)
+
+RaRb_capm
+
+# Juntando base
+
+capm <- beta_valor_portifolio %>%
+  mutate(symbol = 'ÍNDICE NUPE', .before = ActivePremium) %>%
+  bind_rows(RaRb_capm)
+
+capm %>%
+  select(
+    symbol,
+    AnnualizedAlpha,
+    Alpha,
+    Beta,
+    Correlation,
+    `Correlationp-value`,
+    `R-squared`
+    )
+
 # Save data ---------------------------------------------------------------
 
 write_xlsx(
   list(
-    'indice_mensal' = indice_mensal_df,
-    "indice_diario" = indice_df,
+    # 'indice_mensal' = indice_mensal_df,
+    # "indice_diario" = indice_df,
     'indice_valor_portifolio' = valor_portifolio_df,
     'indice_valor_portifolio_mensal' = valor_portifolio_mensal_df,
+    'capm' = capm,
     "base_mensal_price.close" = empresas_mensal_df %>% filter(date >= "2012-01-01"),
     "base_diaria_price.close" = empresas_df.wide %>% filter(date >= "2011-12-29"),
     'base_mensal_long' = empresas_mensal_long %>% filter(date >= "2012-01-01"),
