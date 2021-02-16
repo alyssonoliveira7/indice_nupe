@@ -48,7 +48,7 @@ Ademais, foram retiradas da base as datas comemorativas nacionais, como por exem
 
 # Métricas
 
-Para apuração do IAC, em sua composição, é utilizado o Índice Ponderado por Capitalização de Mercado ajustado pelo *free float*, no qual tange o somatório do produto simples entre as variáveis preço ($P_i$) pela quantidade ($Q_i$) e realizado o quociente pelo indicador *divisor* (empresa.$\\alpha_i$) como objeto de análise e cálculo para formação do número índice.
+Para apuração do IAC, em sua composição, é utilizado o Índice Ponderado por Capitalização de Mercado ajustado pelo *free float*, no qual tange o somatório do produto simples entre as variáveis preço (<img src="https://render.githubusercontent.com/render/math?math=P_i" width="45" height="15"/>) pela quantidade (<img src="https://render.githubusercontent.com/render/math?math=Q_i" width="45" height="15"/>) e realizado o quociente pelo indicador *divisor* (<img src="https://render.githubusercontent.com/render/math?math=\alpha_i" width="45" height="15"/>) como objeto de análise e cálculo para formação do número índice.
 
 Com base no exposto, segue abaixo a fórmula empregada:
 
@@ -56,11 +56,11 @@ Com base no exposto, segue abaixo a fórmula empregada:
 
 Onde:
 
-$P_i$ é o preço de fechamento da ação.
+<img src="https://render.githubusercontent.com/render/math?math=P_i" width="45" height="15"/> é o preço de fechamento da ação.
 
-$Q_i$ é a quantidade de ações disponíveis para negociação de uma empresa.
+<img src="https://render.githubusercontent.com/render/math?math=Q_i" width="45" height="15"/> é a quantidade de ações disponíveis para negociação de uma empresa.
 
-$\\alpha_i$ é o indicador *divisor* que ajusta o valor do índice quando ocorre eventos corporativos quegeram alterações no valor de mercado das ações.
+<img src="https://render.githubusercontent.com/render/math?math=\alpha_i" width="45" height="15"/> é o indicador *divisor* que ajusta o valor do índice quando ocorre eventos corporativos quegeram alterações no valor de mercado das ações.
 
 # Empresas Pertencentes ao Índice
 
