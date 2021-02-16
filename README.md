@@ -52,7 +52,9 @@ Para apuração do IAC, em sua composição, é utilizado o Índice Ponderado po
 
 Com base no exposto, segue abaixo a fórmula empregada:
 
-$$índice = \frac{\sum_{i = 1}^{n}(P_i * Q_i)}{\alpha_i}$$
+![formula](https://render.githubusercontent.com/render/math?math=indice = \frac{\sum_{i = 1}^{n}(P_i * Q_i)}{\alpha_i})
+
+$$indice = \frac{\sum_{i = 1}^{n}(P_i * Q_i)}{\alpha_i}$$
 
 Onde:
 
