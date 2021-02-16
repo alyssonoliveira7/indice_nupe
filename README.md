@@ -26,7 +26,7 @@ As corporações selecionadas para compor o Índice de Ações Cearense devem at
 
 3.  A inclusão de novas empresas no índice ocorrá após 10 dias úteis de sua abertura de capital (*Initial Public Offering* — IPO).
 
-As ações que compõe o índice pode ser excluídas se:
+As ações que compõe o índice podem ser excluídas se:
 
 1.  Descuprirem os critérios de inclusão citados acima;
 
@@ -48,11 +48,11 @@ Ademais, foram retiradas da base as datas comemorativas nacionais, como por exem
 
 # Métricas
 
-Para apuração do IAC, em sua composição, é utilizado o Índice Ponderado por Capitalização de Mercado ajustado pelo *free float*, no qual tange o somatório do produto simples entre as variáveis preço ($P_i$) pela quantidade ($Q_i$) e realizado o quociente pelo indicador *divisor* (empresa.$\alpha_i$) como objeto de análise e cálculo para formação do número índice.
+Para apuração do IAC, em sua composição, é utilizado o Índice Ponderado por Capitalização de Mercado ajustado pelo *free float*, no qual tange o somatório do produto simples entre as variáveis preço ($P_i$) pela quantidade ($Q_i$) e realizado o quociente pelo indicador *divisor* (empresa.$\\alpha_i$) como objeto de análise e cálculo para formação do número índice.
 
 Com base no exposto, segue abaixo a fórmula empregada:
 
-<img src="https://render.githubusercontent.com/render/math?math=indice = \frac{\sum_{i = 1}^{n}(P_i * Q_i)}{\alpha_i}">
+<img src="https://render.githubusercontent.com/render/math?math=indice = \frac{\sum_{i = 1}^{n}(P_i * Q_i)}{\alpha_i}" width="383" height="80"/>
 
 Onde:
 
@@ -60,7 +60,7 @@ $P_i$ é o preço de fechamento da ação.
 
 $Q_i$ é a quantidade de ações disponíveis para negociação de uma empresa.
 
-$\alpha_i$ é o indicador *divisor* que ajusta o valor do índice quando ocorre eventos corporativos quegeram alterações no valor de mercado das ações.
+$\\alpha_i$ é o indicador *divisor* que ajusta o valor do índice quando ocorre eventos corporativos quegeram alterações no valor de mercado das ações.
 
 # Empresas Pertencentes ao Índice
 
