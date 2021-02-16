@@ -54,8 +54,6 @@ Com base no exposto, segue abaixo a fórmula empregada:
 
 <img src="https://render.githubusercontent.com/render/math?math=indice = \frac{\sum_{i = 1}^{n}(P_i * Q_i)}{\alpha_i}">
 
-$$indice = \frac{\sum_{i = 1}^{n}(P_i * Q_i)}{\alpha_i}$$
-
 Onde:
 
 $P_i$ é o preço de fechamento da ação.
