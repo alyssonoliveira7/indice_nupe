@@ -199,7 +199,7 @@ summary {
 </div>
 <div id="tipo-de-índice" class="section level1">
 <h1>Tipo de Índice</h1>
-<p>O IAC é um índice ponderado por capitalização de mercado (Market Value) ajustado ao número de ações em <em>free-float</em>. Esta metodologia de cálculo tem como característica a utilização das ações que estejam disponíveis no mercado, excluindo aquelas que estejam em posse de acionistas estratégicos de longo prazo.</p>
+<p>O IAC é um índice ponderado por capitalização de mercado (<em>Market Value</em>) ajustado ao número de ações em <em>free-float</em>. Esta metodologia de cálculo tem como característica a utilização das ações que estejam disponíveis no mercado, excluindo aquelas que estejam em posse de acionistas estratégicos de longo prazo.</p>
 <p>Na ocorrência de alterações na quantidade de ações de quaisquer empresas devido a eventos corporativos, será efetuado ajuste através de divisor criado e parametrizado para que seja mantida a escala do índice.</p>
 </div>
 <div id="atvios-elegíveis" class="section level1">
@@ -213,7 +213,7 @@ summary {
 <ol style="list-style-type: decimal">
 <li><p>A empresa deverá obrigatoriamente possuir sede no estado do Ceará;</p></li>
 <li><p>A empresa deverá possuir capital aberto e apresentar negociações ativas;</p></li>
-<li><p>A inclusão de novas empresas no índice ocorrá após 10 dias úteis de sua abertura de capital (Initial Public Offering — IPO).</p></li>
+<li><p>A inclusão de novas empresas no índice ocorrá após 10 dias úteis de sua abertura de capital (<em>Initial Public Offering</em> — IPO).</p></li>
 </ol>
 <p>As ações que compõe o índice pode ser excluídas se:</p>
 <ol style="list-style-type: decimal">
@@ -232,9 +232,13 @@ summary {
 </div>
 <div id="métricas" class="section level1">
 <h1>Métricas</h1>
-<p>Para apuração do IAC, em sua composição, é utilizado o Índice Ponderado por Capitalização de Mercado ajustado pelo <em>free float</em>, no qual tange o somatório do produto simples entre as variáveis preço () pela quantidade () e realizado o quociente pelo indicador <em>divisor</em> () como objeto de análise e cálculo para formação do número índice.</p>
+<p>Para apuração do IAC, em sua composição, é utilizado o Índice Ponderado por Capitalização de Mercado ajustado pelo <em>free float</em>, no qual tange o somatório do produto simples entre as variáveis preço (<span class="math inline">\(P_i\)</span>) pela quantidade (<span class="math inline">\(Q_i\)</span>) e realizado o quociente pelo indicador <em>divisor</em> (empresa.<span class="math inline">\(\\alpha_i\)</span>) como objeto de análise e cálculo para formação do número índice.</p>
 <p>Com base no exposto, segue abaixo a fórmula empregada:</p>
+<p><span class="math display">\[índice = \\frac{\\sum\_{i = 1}^{n} (P_i \* Q_i)}{\\alpha_i}\]</span></p>
 <p>Onde:</p>
+<p><span class="math inline">\(P_i\)</span> é o preço de fechamento da ação.</p>
+<p><span class="math inline">\(Q_i\)</span> é a quantidade de ações disponíveis para negociação de uma empresa.</p>
+<p><span class="math inline">\(\\alpha_i\)</span> é o indicador <em>divisor que ajusta o valor do índice quando ocorre eventos corporativos quegeram alterações no valor de mercado das ações.</em></p>
 </div>
 <div id="empresas-pertencentes-ao-índice" class="section level1">
 <h1>Empresas Pertencentes ao Índice</h1>
