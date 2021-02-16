@@ -26,6 +26,7 @@ inicial.date_indice <- ymd('2011-12-29')
 final.date <- today()
 tresh_bad_data <- 0.001
 cache_folder <- 'data/calc_indice'
+cacho_folder_fre <- 'data/fre_data'
 retorno <- "log"
 periodicidade <- "daily"
 
@@ -33,13 +34,26 @@ std_peso = 0.05 # Peso padrão para o cálculo dos índices
 
 international_ticker.ce <- c('ARCE')
 
+qtd_acoes_internacionais <- tibble(
+  dt_refer = ymd(20200101),
+  dt_receb = ymd(20201214),
+  versao = 1,
+  cd_cvm = 1,
+  ticker = 'ARCE',
+  denom_cia = 'Arco Platform Limited',
+  free_float = 29857074,
+  qtd_total = 30180000
+)
+
 tickers.ce <- c(
-  "PGMN3.SA",
-  "BNBR3.SA",
+  'PGMN3.SA',
+  'BNBR3.SA',
+  'COCE3.SA',
   'COCE5.SA',
   'GRND3.SA',
   'MDIA3.SA',
-  'HAPV3.SA'
+  'HAPV3.SA',
+  'AERI3.SA'
 )
 
 # Código das empresas para download do relatório FRE
@@ -50,24 +64,63 @@ cdg_empresas <- c(
   14869, # Coelce
   19615, # Grendene
   20338, # M. Dias Branco
-  24392 # Hapvida
+  24392, # Hapvida
+  25283 # Aeris
+)
+
+cdg_empresas.df <- tribble(
+  ~cd_cvm, ~ticker, ~stock_class,
+  #-------/--------/-----------/
+  22608, 'PGMN3.SA', 'ON', # Pague Menos
+  1228, 'BNBR3.SA', 'ON', # Banco do Nordeste
+  14869, 'COCE3.SA', 'ON', # Coelce
+  14869, 'COCE5.SA', 'PN', # Coelce
+  19615, 'GRND3.SA', 'ON', # Grendene
+  20338, 'MDIA3.SA', 'ON', # M. Dias Branco
+  24392, 'HAPV3.SA', 'ON', # Hapvida
+  25283, 'AERI3.SA', 'ON' # Aeris
 )
 
 # Importação - FRE data ---------------------------------------------------
 
-l_fre <- get_fre_data(companies_cvm_codes = cdg_empresas,
-                      fre_to_read = 'last',
+info_fre <- GetFREData::get_fre_links(
+  companies_cvm_codes = cdg_empresas.df$cd_cvm,
+  first_year = 2020,
+  cache_folder = cacho_folder_fre
+  )
+
+info_fre <- info_fre %>%
+  select(DT_REFER, VERSAO, CD_CVM, DT_RECEB)
+
+
+l_fre <- get_fre_data(companies_cvm_codes = cdg_empresas.df$cd_cvm,
+                      fre_to_read = 'all',
                       first_year = 2020,
                       last_year = 2020,
-                      cache_folder = 'data/fre_data')
+                      cache_folder = cacho_folder_fre)
 
+## Extraindo informações da lista fre
+
+df_capital <- l_fre$df_capital
+
+df_capital <- df_capital %>%
+  left_join(info_fre) %>%
+  relocate(DT_RECEB, .after = DT_REFER)
 
 df_stockholders <- l_fre$df_stockholders
+
+df_stockholders <- df_stockholders %>%
+  left_join(info_fre) %>%
+  relocate(DT_RECEB, .after = DT_REFER)
+
+## Quantidade total de papéis em circulação
 
 qtde_acoes <- df_stockholders %>%
   janitor::clean_names() %>%
   select(
     dt_refer,
+    dt_receb,
+    versao,
     cd_cvm,
     denom_cia,
     type_register,
@@ -78,48 +131,62 @@ qtde_acoes <- df_stockholders %>%
   ) %>%
   as_tibble()
 
-qtde_acoes.df <- qtde_acoes %>%
-  filter(type_register %in% c('Total', 'AcoesTesouraria')) %>%
-  mutate(
-    ticker = case_when(
-      cd_cvm == 1228 ~ 'BNBR3.SA',
-      cd_cvm == 14869 ~ 'COCE5.SA',
-      cd_cvm == 22608 ~ 'PGMN3.SA',
-      cd_cvm == 19615 ~ 'GRND3.SA',
-      cd_cvm == 24392 ~ 'HAPV3.SA',
-      cd_cvm == 20338 ~ 'MDIA3.SA'
-    ),
-    .before = denom_cia
-  ) %>%
-  select(
-    # -type_register,
-    -denom_cia,
-    -type_stockholder,
-    -controlling_stockholder,
-    -cd_cvm
-  ) %>%
+qtde_acoes_total <- qtde_acoes %>%
+  filter(type_register == 'Total') %>%
+  select(-type_register, -type_stockholder, -controlling_stockholder) %>%
+  rename(ON = qtd_ord_shares, PN = qtd_pref_shares) %>%
   pivot_longer(
-    qtd_ord_shares:qtd_pref_shares,
-    values_to = 'qtde_acoes'
+    ON:PN,
+    names_to = 'stock_class',
+    values_to = 'qtde'
   ) %>%
-  filter(name == 'qtd_ord_shares') %>%
-  select(-name) %>%
-  rename(date = dt_refer) %>%
-  mutate(qtde_acoes = as.numeric(qtde_acoes)) %>%
+  filter(qtde > 0) %>%
+  left_join(cdg_empresas.df, by = c('cd_cvm', 'stock_class')) %>%
+  relocate(ticker, .after = cd_cvm) %>%
+  mutate(qtde = as.numeric(qtde))
+
+## Quantidade de papéis em circulação por classe de ação
+
+qtde_acoes_class <- df_capital %>%
+  janitor::clean_names() %>%
+  left_join(cdg_empresas.df, by = c('cd_cvm', 'stock_type' = 'stock_class')) %>%
+  fill(ticker) %>%
+  filter(qtd_issued > 0) %>%
+  select(-cnpj_cia, -id_doc, -versao, -stock_class) %>%
   pivot_wider(
-    names_from = type_register,
-    values_from = qtde_acoes,
+    names_from = 'stock_type',
+    values_from = 'qtd_issued',
     values_fn = sum
   ) %>%
-  mutate(
-    qtde_acoes = Total - AcoesTesouraria
+  mutate_if(is.numeric, ~ifelse(is.na(.), 0, .)) %>%
+  mutate(qtde_total = ON + PN) %>%
+  relocate(c(dt_refer, dt_receb, cd_cvm, ticker), .before = denom_cia)
+
+## Calculando o Free-Float e finalizando a base
+
+qtde_acoes.df <- qtde_acoes %>%
+  filter(type_register == 'Outros') %>%
+  select(-type_stockholder, -controlling_stockholder) %>%
+  rename(ON = qtd_ord_shares, PN = qtd_pref_shares) %>%
+  pivot_longer(ON:PN, names_to = 'stock_class') %>%
+  mutate(value = as.numeric(value)) %>%
+  pivot_wider(
+    names_from = type_register,
+    values_from = value,
+    values_fn = sum
   ) %>%
-  select(-Total, -AcoesTesouraria) %>%
-  add_row(
-    date = ymd(20200101),
-    ticker = 'ARCE',
-    qtde_acoes = 54939088
-  )
+  janitor::clean_names() %>%
+  # mutate(free_float = total - acionista) %>%
+  rename(free_float = outros) %>%
+  filter(free_float > 0) %>%
+  left_join(cdg_empresas.df) %>%
+  # select(-acionista, -total) %>%
+  relocate(ticker, .after = cd_cvm) %>%
+  left_join(qtde_acoes_total) %>%
+  select(-stock_class) %>%
+  rename(qtd_total = qtde)
+
+qtde_acoes.df <- qtde_acoes.df %>% bind_rows(qtd_acoes_internacionais)
 
 # Importação - Calendário ANBIMA ------------------------------------------
 
@@ -132,7 +199,6 @@ cal <- create.calendar(
 )
 
 add.bizdays(ymd(20180926), 30, cal)
-
 
 # Importação - Taxa de Câmbio ---------------------------------------------
 
@@ -157,7 +223,7 @@ cambio <- cambio %>%
 # Empresas nacionais
 
 empresas.ce <- BatchGetSymbols(
-  tickers = tickers.ce,
+  tickers = cdg_empresas.df$ticker,
   first.date = inicial.date,
   last.date = final.date,
   thresh.bad.data = tresh_bad_data,
@@ -391,10 +457,93 @@ empresas_df <- empresas_df %>%
     by = c('date', 'ticker')
   )
 
+# Calculando valores de mercado das empresas ------------------------------
+
+## Valor de mercado diário
+
+vl_mercado_empresas <- empresas_df %>%
+  filter(ticker != 'Ibovespa') %>%
+  select(-volume) %>%
+  left_join(
+    qtde_acoes.df %>%
+      group_by(ticker) %>%
+      filter(versao == max(versao)) %>%
+      ungroup() %>%
+      select(ticker, free_float, qtd_total),
+    by = 'ticker'
+  )
+
+
+vl_mercado_empresas %>%
+  group_by(date) %>%
+  mutate(
+    free_float = ifelse(price.close == 0, 0, free_float),
+    qtd_total = ifelse(price.close == 0, 0, qtd_total),
+    iwf = free_float/qtd_total,
+    prop_ff = free_float/sum(free_float),
+    vl_merc_ff = price.close * free_float,
+    vl_merc_ff_prop = vl_merc_ff / sum(vl_merc_ff)
+  ) %>%
+
+  # Calculo do valor de mercado
+
+  group_by(date) %>%
+  summarise(indice = sum(vl_merc_ff)) %>%
+  ungroup()
 
 
 
+#   mutate(vl_mercado = price.close * qtd_total) %>%
+#   select(-price.close, -qtd_total)
 
+## Valor de mercado mensal
+
+vl_mercado_empresas_mensal <- vl_mercado_empresas %>%
+  group_by(ticker, month = month(date), year = year(date)) %>%
+  slice(which.max(day(date))) %>%
+  ungroup()
+
+vl_mercado_empresas_mensal %>%
+  filter(vl_mercado > 0) %>%
+  ggplot(aes(x = date, y = vl_mercado)) +
+  geom_line() +
+  facet_wrap(~ticker, scales = 'free')
+
+## Valor de mercado anual
+
+
+
+# Calculando Peso - Valor de Mercado --------------------------------------
+
+peso_vl_mercado <- vl_mercado_empresas %>%
+  group_by(date) %>%
+  mutate(
+    peso = vl_mercado / sum(vl_mercado),
+    peso_padronizado = ifelse(peso < 0.05 & peso != 0, 0.05, peso),
+    residuo = sum(peso_padronizado) - 1,
+    peso_padronizado = ifelse(
+      peso_padronizado == max(peso_padronizado),
+      peso_padronizado - residuo,
+      peso_padronizado
+      )
+    ) %>%
+  ungroup() %>%
+  select(-residuo)
+
+# Consolidando base para o cálculo do índice ------------------------------
+
+empresas_df %>%
+  filter(ticker != 'Ibovespa') %>%
+  select(-volume) %>%
+  left_join(peso_vl_mercado) %>%
+  left_join(
+    qtde_acoes.df %>%
+      select(ticker, qtd_total),
+    by = 'ticker'
+  ) %>%
+  mutate(
+    qvar = qtd_total * peso_padronizado
+  ) %>% view
 
 # Cálculo dos pesos -------------------------------------------------------
 
@@ -707,6 +856,12 @@ valor_portifolio_df <- valor_portifolio_df %>%
   drop_na(valor_portifolio) %>%
   mutate(indice = (valor_portifolio/first(valor_portifolio))*100)
 
+
+valor_portifolio_df %>%
+  ggplot(aes(x = date, y = indice)) +
+  geom_line()
+
+
 # ibovespaXindice - Base diária -------------------------------------------
 
 # Índice de valor
@@ -792,8 +947,6 @@ valor_portifolio_mensal_df <- valor_portifolio_mensal_df %>%
       ),
     .after = last_col()
     )
-
-
 
 # Tabela Estatística das empresas e do índice -----------------------------
 
@@ -1125,9 +1278,6 @@ tab_ret_emp <- retorno_mensal %>%
     )
   ) %>%
   arrange(ticker)
-
-
-
 
 # Formatando Bases para Output --------------------------------------------
 
