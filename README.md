@@ -128,6 +128,8 @@ Onde:
 é o indicador *divisor* que ajusta o valor do índice quando ocorre
 eventos corporativos quegeram alterações no valor de mercado das ações.
 
+testando a inclusão de fórmulas *P*<sub>*i*</sub>
+
 # Empresas Pertencentes ao Índice
 
 As Empresas pertencentes a composição inicial do Índice de Ações

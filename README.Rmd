@@ -17,7 +17,6 @@ O Índice de Ações Cearense (IAC) objetiva acompanhar o desempenho médio das 
 
 Vale salientar que não se trata de recomendação de investimento, pois é indicador estritamente acadêmico, elaborado por alunos e professores do Curso de Ciências Econômicas da Universidade de Fortaleza – Unifor. Portanto, não há garantia de que uma estratégia de investimentos baseada no IAC será bem-sucedida. O IAC não emite, patrocina, endossa, comercializa, oferece ou expressa qualquer opinião sobre valores mobiliários baseado ou vinculado a um retorno de investimento relacionado ao desempenho do Índice de Ações Cearense. O IAC mede o desempenho histórico, de maneira que os retornos passados não são garantia de retornos futuros.
 
-
 # Tipo de Índice
 
 O IAC é um índice ponderado por capitalização de mercado (*Market Value*) ajustado ao número de ações em *free-float*. Esta metodologia de cálculo tem como característica a utilização das ações que estejam disponíveis no mercado, excluindo aquelas que estejam em posse de acionistas estratégicos de longo prazo.
@@ -75,6 +74,8 @@ Onde:
 <img src="https://render.githubusercontent.com/render/math?math=Q_i" width="45" height="15"/> é a quantidade de ações disponíveis para negociação de uma empresa.
 
 <img src="https://render.githubusercontent.com/render/math?math=\alpha_i" width="45" height="15"/> é o indicador *divisor* que ajusta o valor do índice quando ocorre eventos corporativos quegeram alterações no valor de mercado das ações.
+
+testando a inclusão de fórmulas $P_i$
 
 # Empresas Pertencentes ao Índice
 
