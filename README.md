@@ -105,28 +105,23 @@ foram repetidas as informações do dia anterior.
 Para apuração do IAC, em sua composição, é utilizado o Índice Ponderado
 por Capitalização de Mercado ajustado pelo *free float*, no qual tange o
 somatório do produto simples entre as variáveis preço
-(<img src="https://render.githubusercontent.com/render/math?math=P_i" width="45" height="15"/>)
-pela quantidade
-(<img src="https://render.githubusercontent.com/render/math?math=Q_i" width="45" height="15"/>)
-e realizado o quociente pelo indicador *divisor*
-(<img src="https://render.githubusercontent.com/render/math?math=\alpha_i" width="45" height="15"/>)
-como objeto de análise e cálculo para formação do número índice.
+(*P*<sub>*i*</sub>) pela quantidade (*Q*<sub>*i*</sub>) e realizado o
+quociente pelo indicador *divisor* (*α*<sub>*i*</sub>) como objeto de
+análise e cálculo para formação do número índice.
 
 Com base no exposto, segue abaixo a fórmula empregada:
 
-<img src="https://render.githubusercontent.com/render/math?math=indice = \frac{\sum_{i = 1}^{n}(P_i * Q_i)}{\alpha_i}" width="383" height="80"/>
-
+$$índice = \\frac{\\sum\_{i = 1}^{n}(P\_i \* Q\_i)}{\\alpha\_i}$$
 Onde:
 
-<img src="https://render.githubusercontent.com/render/math?math=P_i" width="45" height="15"/>
-é o preço de fechamento da ação.
+***P*<sub>*i*</sub>** é o preço de fechamento da ação.
 
-<img src="https://render.githubusercontent.com/render/math?math=Q_i" width="45" height="15"/>
-é a quantidade de ações disponíveis para negociação de uma empresa.
+***Q*<sub>*i*</sub>** é a quantidade de ações disponíveis para
+negociação de uma empresa.
 
-<img src="https://render.githubusercontent.com/render/math?math=\alpha_i" width="45" height="15"/>
-é o indicador *divisor* que ajusta o valor do índice quando ocorre
-eventos corporativos quegeram alterações no valor de mercado das ações.
+***α*<sub>*i*</sub>** é o indicador *divisor* que ajusta o valor do
+índice quando ocorre eventos corporativos quegeram alterações no valor
+de mercado das ações.
 
 testando a inclusão de fórmulas *P*<sub>*i*</sub>
 
