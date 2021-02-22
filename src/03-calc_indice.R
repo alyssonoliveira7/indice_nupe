@@ -1019,8 +1019,6 @@ RaRb_capm <- RaRb_capm %>%
   bind_rows(RaRb_capm_int) %>%
   bind_rows(capm_empresas_recentes_pgmn3)
 
-
-
 # Tabela com Retorno das empresas -----------------------------------------
 
 retornos_base <- indice %>%
@@ -1065,7 +1063,6 @@ retornos_base <- indice %>%
     ticker = ifelse(ticker == 'ibovespa', 'Ibovespa', ticker)
   )
 
-
 # Calculando o retorno anual das empresas e do índice
 
 tab_retorno_anual <- indice %>%
@@ -1108,7 +1105,6 @@ tab_retorno_anual <- indice %>%
     ticker = ifelse(ticker == 'indice', 'Índice', ticker),
     ticker = ifelse(ticker == 'ibovespa', 'Ibovespa', ticker)
   )
-
 
 # Calculando retorno da Pague menos
 
@@ -1319,7 +1315,6 @@ g1 <- base %>%
     legend.position = 'none',
     plot.caption = element_text(hjust = 0)
   )
-
 
 g2 <- base %>%
   select(date, ticker, price.close) %>%
