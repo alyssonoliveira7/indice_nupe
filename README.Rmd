@@ -65,7 +65,8 @@ Para apuração do IAC, em sua composição, é utilizado o Índice Ponderado po
 
 Com base no exposto, segue abaixo a fórmula empregada:
 
-$$índice = \frac{\sum_{i = 1}^{n}(P_i * Q_i)}{\alpha_i}$$
+<img src="https://render.githubusercontent.com/render/math?math=indice = \frac{\sum_{i = 1}^{n}(P_i * Q_i)}{\alpha_i}" width="383" height="80"/>
+
 Onde:
 
 **$P_i$** é o preço de fechamento da ação.

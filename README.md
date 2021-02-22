@@ -111,7 +111,8 @@ análise e cálculo para formação do número índice.
 
 Com base no exposto, segue abaixo a fórmula empregada:
 
-$$índice = \\frac{\\sum\_{i = 1}^{n}(P\_i \* Q\_i)}{\\alpha\_i}$$
+<img src="https://render.githubusercontent.com/render/math?math=indice = \frac{\sum_{i = 1}^{n}(P_i * Q_i)}{\alpha_i}" width="383" height="80"/>
+
 Onde:
 
 ***P*<sub>*i*</sub>** é o preço de fechamento da ação.
