@@ -58,7 +58,7 @@ qtd_acoes_internacionais <- tibble(
   ticker = c('ARCE'),
   denom_cia = c('Arco Platform Limited'),
   free_float = c(55545000),
-  qtd_total = c(55737000)
+  qtd_total = c(57587563)
 )
 
 ## Dados empresas nacionais
@@ -103,7 +103,6 @@ info_fre <- GetFREData::get_fre_links(
 
 info_fre <- info_fre %>%
   select(DT_REFER, VERSAO, CD_CVM, DT_RECEB)
-
 
 l_fre <- get_fre_data(companies_cvm_codes = cdg_empresas.df$cd_cvm,
                       fre_to_read = 'all',
@@ -378,6 +377,16 @@ ibovespa_df <- ibovespa_df %>%
 
 ibovespa_df$ticker[ibovespa_df$ticker == "^BVSP"] <- "Ibovespa"
 
+ibovespa_df <- ibovespa_df %>%
+  add_row(
+    ticker = 'Ibovespa',
+    date = inicial.date_indice,
+    volume = 3087000,
+    price.close = 57829
+  ) %>%
+  arrange(date)
+
+
 # Consolidando Base de dados - Empresas Cearenses -------------------------
 
 empresas_ce_nacionais <- empresas_ce_nacionais %>%
@@ -585,7 +594,6 @@ data_entrada <- base %>%
   select(-price.close) %>%
   mutate(data_entrada = add.bizdays(data_ipo, data_inclusao, cal))
 
-
 ## Testando entrada das empresas no índice
 
 base <- base %>%
@@ -743,7 +751,6 @@ data_tx_variacao <- indice_mensal %>%
 
 tx_variacao_valor$date <- data_tx_variacao
 
-
 tx_variacao_valor <- tx_variacao_valor %>%
   select(-year_date) %>%
   relocate(date)
@@ -812,7 +819,6 @@ retorno_anual <- base %>%
   ) %>%
   drop_na(return.price.close) %>%
   filter(return.price.close != Inf)
-
 
 tab_stats_empresas <- retorno_mensal %>%
   tq_performance(
@@ -933,7 +939,6 @@ RaRb_capm$ticker[RaRb_capm$ticker == "ARCE"] <- "ARCE_Ibovespa"
 
 ## CAPM das empresas adicionadas recentemente
 
-
 ### Pague menos
 
 capm_empresas_recentes_pgmn3 <- empresas_recentes %>%
@@ -990,7 +995,6 @@ ret_mensal_emp_int <- empresas_internacionais_ce %>%
       ),
     by = "date"
   )
-
 
 RaRb_capm_int <- ret_mensal_emp_int %>%
   tq_performance(
@@ -1196,7 +1200,6 @@ tab_ret_emp <- indice_mensal %>%
   fill(date, .direction = 'updown') %>%
   relocate(date)
 
-
 tab_ret_emp <- tab_ret_emp %>%
   left_join(
     retornos_base %>%
@@ -1281,9 +1284,6 @@ write_xlsx(
   "out/indice_nupe.xlsx"
 )
 
-
-
-
 g1 <- base %>%
   select(date, ticker, price.close) %>%
   filter(date >= '2021-01-01') %>%
@@ -1349,7 +1349,6 @@ g2 <- base %>%
     plot.caption = element_text(hjust = 0)
   )
 
-
 b <- base_mensal %>%
   select(date_month, ticker, price.close) %>%
   group_by(ticker) %>%
@@ -1369,7 +1368,6 @@ ggsave(
   dpi = 'print'
 )
 
-
 ggsave(
   plot = g2,
   filename = 'g2.png',
@@ -1380,7 +1378,6 @@ ggsave(
   units = 'cm',
   dpi = 'print'
 )
-
 
 # write_xlsx(
 #   list(
@@ -1395,10 +1392,3 @@ ggsave(
 #     ),
 #   'teste.xlsx'
 #   )
-
-
-
-
-
-
-
