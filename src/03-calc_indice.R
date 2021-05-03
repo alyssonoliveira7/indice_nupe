@@ -94,31 +94,54 @@ base_free_float <- base_free_float %>%
 
 # Importação - FRE data ---------------------------------------------------
 
-info_fre <- GetFREData::get_fre_links(
+info_fre_2020 <- GetFREData::get_fre_links(
   companies_cvm_codes = cdg_empresas.df$cd_cvm,
   first_year = 2020,
-  last_year = year(today()),
-  cache_folder = cacho_folder_fre
+  last_year = 2020,
+  cache_folder = paste(cacho_folder_fre, '2020', sep = '/')
 )
+
+info_fre_2021 <- GetFREData::get_fre_links(
+  companies_cvm_codes = cdg_empresas.df$cd_cvm,
+  first_year = 2021,
+  last_year = 2021,
+  cache_folder = paste(cacho_folder_fre, '2021', sep = '/')
+)
+
+info_fre <- bind_rows(info_fre_2020, info_fre_2021)
 
 info_fre <- info_fre %>%
   select(DT_REFER, VERSAO, CD_CVM, DT_RECEB)
 
-l_fre <- get_fre_data(companies_cvm_codes = cdg_empresas.df$cd_cvm,
+l_fre_2020 <- get_fre_data(companies_cvm_codes = cdg_empresas.df$cd_cvm,
                       fre_to_read = 'all',
                       first_year = 2020,
-                      last_year = year(today()),
-                      cache_folder = cacho_folder_fre)
+                      last_year = 2020,
+                      cache_folder = paste(cacho_folder_fre, '2020', sep = '/'))
+
+l_fre_2021 <- get_fre_data(companies_cvm_codes = cdg_empresas.df$cd_cvm,
+                      fre_to_read = 'all',
+                      first_year = 2021,
+                      cache_folder = paste(cacho_folder_fre, '2021', sep = '/'))
 
 ## Extraindo informações da lista fre
 
-df_capital <- l_fre$df_capital
+df_capital_2020 <- l_fre_2020$df_capital
+
+df_capital_2021 <- l_fre_2021$df_capital
+
+df_capital <- bind_rows(df_capital_2020, df_capital_2021)
+
 
 df_capital <- df_capital %>%
   left_join(info_fre) %>%
   relocate(DT_RECEB, .after = DT_REFER)
 
-df_stockholders <- l_fre$df_stockholders
+df_stockholders_2020 <- l_fre_2020$df_stockholders
+
+df_stockholders_2021 <- l_fre_2021$df_stockholders
+
+df_stockholders <- bind_rows(df_stockholders_2020, df_stockholders_2021)
 
 df_stockholders <- df_stockholders %>%
   left_join(info_fre) %>%
@@ -200,6 +223,7 @@ qtde_acoes.df <- qtde_acoes %>%
 qtde_acoes.df <- qtde_acoes.df %>%
   bind_rows(qtd_acoes_internacionais) %>%
   arrange(dt_receb)
+
 
 # Importação - Calendário ANBIMA ------------------------------------------
 
@@ -512,6 +536,12 @@ empresas_df %>%
       calc_free_float == F ~ price.close * qtd_total
     )
   )
+
+qtde_acoes.df %>%
+  group_by(ano = year(dt_receb), ticker) %>%
+  filter(versao == max(versao)) %>%
+  ungroup() %>%
+  select(ticker, qtd_total)
 
 ## Valor de mercado diário
 
@@ -1283,112 +1313,3 @@ write_xlsx(
   ),
   "out/indice_nupe.xlsx"
 )
-
-g1 <- base %>%
-  select(date, ticker, price.close) %>%
-  filter(date >= '2021-01-01') %>%
-  ggplot(aes(x = date, y = price.close, col = ticker)) +
-  geom_line(size = 1) +
-  geom_point() +
-  facet_wrap(~ticker, scales = 'free_y') +
-  theme_test() +
-  scale_x_date(
-    date_breaks = '3 days',
-    date_labels = '%d-%b',
-    guide = guide_axis(angle = 45)
-  ) +
-  scale_y_continuous(
-    labels = scales::comma_format(
-      prefix = 'R$ ',
-      big.mark = '.',
-      decimal.mark = ','
-    )
-  ) +
-  labs(
-    title = 'Gráfico 1 - Preço de fechamento diário das empresas cearenses listadas em bolsa de valores.',
-    subtitle = 'Janeiro de 2021.',
-    x = '',
-    y = '',
-    caption = 'Fornte: Yahoo Finance. Elaboração: Nupe/Unifor.'
-  ) +
-  theme(
-    legend.position = 'none',
-    plot.caption = element_text(hjust = 0)
-  )
-
-g2 <- base %>%
-  select(date, ticker, price.close) %>%
-  filter(date >= '2020-12-30') %>%
-  group_by(ticker) %>%
-  mutate(retorno = price.close/first(price.close) - 1) %>%
-  ungroup() %>%
-  filter(date > '2020-12-30') %>%
-  ggplot(aes(x = date, y = retorno, col = ticker)) +
-  geom_line() +
-  geom_point() +
-  geom_hline(yintercept = 0, linetype = 'dashed') +
-  facet_wrap(~ticker, scales = 'free') +
-  theme_test() +
-  scale_x_date(
-    date_breaks = '3 days',
-    date_labels = '%d-%b',
-    guide = guide_axis(angle = 45)
-  ) +
-  scale_y_continuous(
-    labels = scales::percent_format(accuracy = 0.1)
-  ) +
-  labs(
-    title = 'Gráfico 2 - Retorno diário das empresas cearenses listadas em bolsa de valores.',
-    subtitle = 'Acumulado de Janeiro de 2021.',
-    x = '',
-    y = '',
-    caption = 'Fornte: Yahoo Finance. Elaboração: Nupe/Unifor.'
-  ) +
-  theme(
-    legend.position = 'none',
-    plot.caption = element_text(hjust = 0)
-  )
-
-b <- base_mensal %>%
-  select(date_month, ticker, price.close) %>%
-  group_by(ticker) %>%
-  mutate(
-    retorno = price.close/lag(price.close),
-    retorno_12_meses = price.close/lag(price.close, 12) - 1
-    )
-
-ggsave(
-  plot = g1,
-  filename = 'g1.png',
-  device = 'png',
-  path = 'figs',
-  width = 25,
-  height = 15,
-  units = 'cm',
-  dpi = 'print'
-)
-
-ggsave(
-  plot = g2,
-  filename = 'g2.png',
-  device = 'png',
-  path = 'figs',
-  width = 24,
-  height = 17,
-  units = 'cm',
-  dpi = 'print'
-)
-
-# write_xlsx(
-#   list(
-#     'b' = b,
-#     'c' = b %>%
-#       select(date_month, ticker, retorno) %>%
-#       pivot_wider(
-#         names_from = ticker,
-#         values_from = retorno
-#       )
-#
-#     ),
-#   'teste.xlsx'
-#   )
