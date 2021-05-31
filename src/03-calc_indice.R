@@ -235,7 +235,6 @@ cal <- create.calendar(
   weekdays = c("saturday", "sunday")
 )
 
-add.bizdays(ymd(20180926), 30, cal)
 
 # Importação - Taxa de Câmbio ---------------------------------------------
 
@@ -571,28 +570,45 @@ if (vl_free_float_status == F) {
 
 }else{
 
+  qtde_total <- qtde_acoes.df %>%
+    mutate(
+      dt_receb = if_else(
+        lubridate::year(dt_refer) == lubridate::year(dt_receb),
+        dt_receb, ymd(NA)
+      )
+    ) %>%
+    arrange(dt_refer, dt_receb) %>%
+    group_by(ticker) %>%
+    fill(dt_receb, .direction = 'down') %>%
+    ungroup() %>%
+    mutate(
+      qtd_total = if_else(
+        ticker == 'HAPV3.SA' & dt_receb < '2020-11-26',
+        qtd_total * 5, qtd_total
+      )
+    ) %>%
+    select(dt_receb, ticker, qtd_total) %>%
+    unique.data.frame()
+
   base <- empresas_df %>%
     filter(ticker != 'Ibovespa', date != '2018-04-25') %>%
     select(-volume) %>%
-    left_join(
-      qtde_acoes.df %>%
-        group_by(ticker) %>%
-        filter(versao == max(versao)) %>%
-        ungroup() %>%
-        select(ticker, qtd_total),
-      by = 'ticker'
-    ) %>%
+    left_join(qtde_total, by = c('date' = 'dt_receb', 'ticker')) %>%
+    group_by(ticker) %>%
+    fill(qtd_total, .direction = 'down') %>%
+    fill(qtd_total, .direction = 'up') %>%
+    ungroup() %>%
     mutate(
       date_month = ymd(format(date, '%Y-%m-01')),
       .after = date
     ) %>%
     left_join(
-      base_free_float %>%
-        select(-date),
-      by = c('date_month', 'ticker')
+      base_free_float,
+      by = c('date', 'date_month', 'ticker')
     ) %>%
     group_by(ticker) %>%
-    fill(free_float_perc, .direction = 'updown') %>%
+    fill(free_float_perc, .direction = 'down') %>%
+    fill(free_float_perc, .direction = 'up') %>%
     ungroup() %>%
     mutate(
       free_float = qtd_total * free_float_perc,
@@ -611,6 +627,8 @@ if (vl_free_float_status == F) {
     )
 
 }
+
+
 
 ## Identificando data inicial para cada ticker e entrada no índice
 
@@ -1261,8 +1279,18 @@ base_contribuicao <- base %>%
     by = 'date'
   )
 
-contribuicao <- slice_max(base_contribuicao, order_by = date) %>%
+# Contribuição do mês t-1
+
+contribuicao <- base_contribuicao %>%
+  group_by(ticker, month = month(date), year = year(date)) %>%
+  slice(which.max(day(date))) %>%
+  ungroup() %>%
+  arrange(date) %>%
+  select(-month, -year) %>%
+  filter(date < dplyr::last(date)) %>%
+  slice_max(order_by = date) %>%
   arrange(desc(contribuicao))
+
 
 ## Base diária Wide
 
