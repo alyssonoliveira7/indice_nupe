@@ -35,7 +35,7 @@ lag_tab_stat <- 48
 tresh_bad_data <- 0.001
 cache_folder <- 'data/calc_indice'
 cacho_folder_fre <- 'data/fre_data'
-retorno <- "log"
+retorno <- "arit"
 periodicidade <- "daily"
 
 std_peso = 0.01 # Peso padrão para o cálculo dos índices
@@ -73,8 +73,13 @@ cdg_empresas.df <- tribble(
   19615, 'GRND3.SA', 'ON', # Grendene
   20338, 'MDIA3.SA', 'ON', # M. Dias Branco
   24392, 'HAPV3.SA', 'ON', # Hapvida
-  25283, 'AERI3.SA', 'ON' # Aeris
+  25283, 'AERI3.SA', 'ON', # Aeris
+  26085, 'BRIT3.SA', 'ON'
 )
+
+#' *O Cálculo do retorno destas empresas serão feitas separadamente*
+
+tickers_empresas_recentes <- c('PGMN3.SA', 'AERI3.SA', 'BRIT3.SA')
 
 # Importando - Free-float das empresas ------------------------------------
 
@@ -93,6 +98,8 @@ base_free_float <- base_free_float %>%
   )
 
 # Importação - FRE data ---------------------------------------------------
+
+#GetFREData::search_company('Brisanet')
 
 info_fre_2020 <- GetFREData::get_fre_links(
   companies_cvm_codes = cdg_empresas.df$cd_cvm,
@@ -131,7 +138,6 @@ df_capital_2020 <- l_fre_2020$df_capital
 df_capital_2021 <- l_fre_2021$df_capital
 
 df_capital <- bind_rows(df_capital_2020, df_capital_2021)
-
 
 df_capital <- df_capital %>%
   left_join(info_fre) %>%
@@ -234,7 +240,6 @@ cal <- create.calendar(
   holidays = holidaysANBIMA,
   weekdays = c("saturday", "sunday")
 )
-
 
 # Importação - Taxa de Câmbio ---------------------------------------------
 
@@ -624,11 +629,10 @@ if (vl_free_float_status == F) {
         calc_free_float == T ~ price.close * free_float,
         calc_free_float == F ~ price.close * qtd_total
       )
-    )
+    ) %>%
+    unique.data.frame()
 
 }
-
-
 
 ## Identificando data inicial para cada ticker e entrada no índice
 
@@ -707,7 +711,14 @@ redutor <- vl_merc %>%
   mutate(cmv = vl_merc/lag(vl_merc)) %>%
   filter(!is.na(cmv)) %>%
   mutate(
-    data_ipo = ifelse(date %in% data_entrada$data_entrada, 1, 0),
+    data_ipo = ifelse(
+      date %in% c(
+        data_entrada$data_entrada,
+        '2021-04-20', # Mudança de Free-floa HAPVIDA
+        '2021-05-31', # Mudança de Free-floa HAPVIDA
+        '2021-08-16' #' _Entrada da Brisanet_
+
+        ), 1, 0),
     indice = (vl_merc/first(vl_merc)) * 100,
     redutor_inicial = vl_merc/indice
   ) %>%
@@ -926,8 +937,6 @@ tab_stats <- indice %>%
   )
 
 # Beta das Empresas e do Índice -------------------------------------------
-
-tickers_empresas_recentes <- c('PGMN3.SA', 'AERI3.SA')
 
 # Download dos dados da Pague menos separados
 
@@ -1341,3 +1350,4 @@ write_xlsx(
   ),
   "out/indice_nupe.xlsx"
 )
+
