@@ -74,7 +74,7 @@ cdg_empresas.df <- tribble(
   20338, 'MDIA3.SA', 'ON', # M. Dias Branco
   24392, 'HAPV3.SA', 'ON', # Hapvida
   25283, 'AERI3.SA', 'ON', # Aeris
-  26085, 'BRIT3.SA', 'ON'
+  26085, 'BRIT3.SA', 'ON' # Brisanet
 )
 
 #' *O Cálculo do retorno destas empresas serão feitas separadamente*
@@ -229,7 +229,6 @@ qtde_acoes.df <- qtde_acoes %>%
 qtde_acoes.df <- qtde_acoes.df %>%
   bind_rows(qtd_acoes_internacionais) %>%
   arrange(dt_receb)
-
 
 # Importação - Calendário ANBIMA ------------------------------------------
 
